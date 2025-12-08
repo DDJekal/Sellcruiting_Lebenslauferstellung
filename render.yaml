@@ -1,0 +1,43 @@
+services:
+  - type: web
+    name: ki-sellcruiting-processor
+    env: python
+    region: frankfurt  # EU region
+    plan: starter  # Free tier
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn webhook_server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      # OpenAI API (required)
+      - key: OPENAI_API_KEY
+        sync: false  # Set manually in Render Dashboard
+      
+      # OpenAI Model (optional, defaults to gpt-4o-2024-08-06)
+      - key: OPENAI_MODEL
+        value: gpt-4o-2024-08-06
+      
+      # Anthropic API (optional, for MCP temporal validation)
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      
+      # MCP Configuration (optional)
+      - key: USE_MCP_TEMPORAL_VALIDATION
+        value: false
+      - key: MCP_CONFIDENCE_THRESHOLD
+        value: "0.8"
+      
+      # Protocol Template (optional, defaults to 63)
+      - key: DEFAULT_PROTOCOL_TEMPLATE_ID
+        value: "63"
+      
+      # HOC API Configuration (set these after HOC details are available)
+      - key: HOC_API_URL
+        sync: false  # e.g., https://hoc-api.example.com
+      - key: HOC_API_KEY
+        sync: false
+    
+    # Health check
+    healthCheckPath: /health
+    
+    # Auto-deploy on push
+    autoDeploy: true
+

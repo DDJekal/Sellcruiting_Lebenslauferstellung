@@ -1,0 +1,49 @@
+Sellcruiting Skript, Version 6.1 – AIDA 
+“Guten Tag, mein Name ist [MEIN VOR- und NACHNAME] aus dem Recruiting Team ( Kundename) . 
+Heute melden wir uns bei Ihnen aufgrund Ihrer Online-Bewerbung als [STELLE] für den Standort XY.
+Sie haben sich am [DATUM] über die sozialen Medien bei uns beworben. Passt es Ihnen, wenn wir uns jetzt darüber unterhalten?
+“Wie lange würde das denn dauern?” 
+Ich denke 10 bis maximal 15 Minuten. 
+“Ja // Nein” 
+Okay, super. // Wann würde es Ihnen denn besser passen?
+
+Ich würde heute gerne mit ihnen über mehr als nur ihre fachlichen Qualifikationen sprechen. Aber lassen uns zum Start doch genau damit anfangen. 
+Datenabgleich – Anforderungen an Person
+1.Wir sind in [ORTSCHAFT] gelegen. Aus welcher Gegend kommen sie?
+“...” Das passt doch von der Entfernung, oder?
+2.
+a.	Welche Ausbildung haben sie genau gemacht?
+b.	In welchem Jahr?
+c.	Wo?
+d.	Haben Sie auch weitere Aus- oder Weiterbildungen abgeschlossen?
+e.	Ich möchte gern einen Lebenslauf der letzten 5 Jahre / 3 Stationen erstellen, damit meine Kollegen einen Überblick erhalten. Ich möchte diesen antichronologisch gestalten. Was machen Sie aktuell beruflich?
+3. Bei uns gibt es Kriterien, die sehr wichtig sind:
+Ausschlusskriterien abfragen (siehe Gesprächsprotokoll Kriterien /Rahmenbedingungen)
+….
+...
+4.Warum möchten Sie ihren Arbeitgeber eigentlich wechseln?
+5. Angenommen wir wären der richtige Arbeitgeber für sie, was wären dann ihre Erwartungen an uns als Arbeitgeber?" ODER "Was wären ihre Erwartungen an uns als möglichen Arbeitgeber, bei dem sie auch vorstellen könnten, langfristig zu bleiben?
+Haben sie sich schon mit unserem Unternehmen beschäftigt?
+“Ja // Nein ...” 
+Das freut mich zu hören! Was hat ihnen denn am besten gefallen? // kein Problem.
+Ich kann ihnen ja kurz nochmal etwas zu uns erzählen und was uns wichtig ist. 
+-	Wir sind [INFORMATION AUS ONBOARDING] 
+-	Wir legen bei unserer Arbeit den größten Wert auf [INFORMATION AUS ONBOARDING]
+[INFORMATION AUS ONBOARDING PLASTISCH DARSTELLEN]
+Wie klingt das für sie? 
+“...”
+Klingt gut :) Ich habe zum Schluss noch einige Fragen an sie:
+
+Datenabgleich – Rahmenbedingungen der Stelle
+1.	Noch zu guter Letzt:
+a.	Wann könnten Sie bei uns anfangen?
+b.	[WEITERE KRITERIEN / Rahmenbedingungen AUS GESPRÄCHSPROTOKOLL ABFRAGEN]
+Super, dann haben wir es so weit geschafft!
+[BEWERBERNAME], ich habe das Gefühl, dass sie super in unser Team passen könnten. 
+Ich möchte, dass sie unsere/n [HERRN / FRAU KUNDENRECRUITER] kennenlernen. Er/sie kümmert sich um die Einstellungen bei uns im Unternehmen. Ihr würdet gemeinsam ein ausführliches Gespräch über die Stelle und die Rahmenbedingungen führen, er/sie beantwortet alle ihre Fragen und dann vereinbart ihr vielleicht auch schon direkt ein persönliches Gespräch. 
+Sie haben angegeben, dass sie immer um [ERREICHBARKEIT] erreichbar sind, richtig?
+Das heißt, wenn [HERR / FRAU KUNDENRECRUITER] in den nächsten Tagen zwischen 10 und 12 Uhr (immer 2 Stunden-Slots) anruft, ist das okay?
+Super. Dann gebe ich das alles so weiter. 
+Ich danke ihnen, für ihre Zeit. Ich wünsche ihnen noch einen schönen [Tag/Abend], [BEWERBERVORNAME] und vielleicht bis bald?
+Tschüss!
+

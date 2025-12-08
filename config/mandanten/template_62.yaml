@@ -1,0 +1,56 @@
+# Auto-generated config for: Leitungskraft für unsere Kita (mwd)
+# Template ID: 62
+# Generated from protocol template
+
+mandant_id: template_62
+protokoll_template_id: 62
+heuristic_rules:
+- pattern: alternativ.*weiterleiten
+  type: routing_rule
+  confidence: 0.93
+- pattern: nachweis.*(fortbildungen|qualifizierungen)
+  type: text_list
+  confidence: 0.9
+- pattern: (vollzeit|wochenstunden|39)
+  type: yes_no
+  confidence: 0.9
+- pattern: vergütung.*(tv-l|tarif|€|euro)
+  type: yes_no_with_details
+  confidence: 0.88
+info_page_names:
+- Weitere Informationen
+grounding:
+  urlaub_tage: 30
+  tarifvertrag: TV-L Berlin
+aida_phase_mapping:
+  interest:
+  - 291
+  - 289
+  - 287
+  - 285
+  - 283
+  - 281
+  action:
+  - 297
+  - 295
+  - 293
+must_criteria:
+- prompt_id: 289
+  expected: true
+  error_msg: 'Zwingendes Kriterium nicht erfüllt: Zwingend: Deutschkenntnisse B2...'
+- prompt_id: 285
+  expected: true
+  error_msg: 'Zwingendes Kriterium nicht erfüllt: Zwingend: mehrjährige Berufserfahrung...'
+- prompt_id: 281
+  expected: true
+  error_msg: 'Zwingendes Kriterium nicht erfüllt: Zwingend: staatlich anerkannter
+    Abschluss in einem sozialpäd...'
+routing_rules: []
+implicit_defaults:
+- prompt_id: 289
+  reasoning: Gespräch wurde auf Deutsch geführt
+  default_answer:
+    checked: true
+    value: ja
+    confidence: 0.8
+    notes: Implizit angenommen (Gespräch auf Deutsch)

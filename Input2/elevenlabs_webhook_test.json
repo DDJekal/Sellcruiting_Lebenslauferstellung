@@ -1,0 +1,108 @@
+{
+  "type": "post_call_transcription",
+  "event_timestamp": 1733404800,
+  "data": {
+    "agent_id": "agent_test123",
+    "conversation_id": "conv_test456",
+    "status": "done",
+    "user_id": null,
+    "branch_id": null,
+    "transcript": [
+      {
+        "role": "user",
+        "message": "Hallo.",
+        "time_in_call_secs": 1
+      },
+      {
+        "role": "agent",
+        "message": "Guten Tag! Hier spricht der Recruiting-Assistent von Test Company. Vielen Dank für Ihre Bewerbung als Projektleiter. Ich würde gerne mit Ihnen über die Position sprechen. Haben Sie gerade etwa zehn Minuten Zeit?",
+        "time_in_call_secs": 3
+      },
+      {
+        "role": "user",
+        "message": "Ja, die habe ich.",
+        "time_in_call_secs": 15
+      },
+      {
+        "role": "agent",
+        "message": "Wunderbar. Sie haben ein Studium der Elektrotechnik mitgebracht?",
+        "time_in_call_secs": 18
+      },
+      {
+        "role": "user",
+        "message": "Ja genau, ich studiere derzeit Elektrotechnik. Ich bin gerade im Abschlusssemester.",
+        "time_in_call_secs": 22
+      },
+      {
+        "role": "agent",
+        "message": "Sehr gut. Wann schließen Sie denn voraussichtlich ab?",
+        "time_in_call_secs": 28
+      },
+      {
+        "role": "user",
+        "message": "Voraussichtlich Anfang Februar nächstes Jahr.",
+        "time_in_call_secs": 32
+      },
+      {
+        "role": "agent",
+        "message": "Perfekt. Haben Sie bereits Berufserfahrung sammeln können?",
+        "time_in_call_secs": 36
+      },
+      {
+        "role": "user",
+        "message": "Ja, ich studiere dual. Das bedeutet, ich bin seit August 2021 bei einer Firma angestellt und arbeite dort seit zwei Jahren in der Konstruktion.",
+        "time_in_call_secs": 42
+      },
+      {
+        "role": "agent",
+        "message": "Das klingt sehr gut. Die Stelle ist in Vollzeit ausgeschrieben, wäre das für Sie in Ordnung?",
+        "time_in_call_secs": 50
+      },
+      {
+        "role": "user",
+        "message": "Ja, absolut.",
+        "time_in_call_secs": 53
+      },
+      {
+        "role": "agent",
+        "message": "Ein Führerschein liegt auch vor?",
+        "time_in_call_secs": 56
+      },
+      {
+        "role": "user",
+        "message": "Ja genau, B und BE mit Anhänger.",
+        "time_in_call_secs": 59
+      },
+      {
+        "role": "agent",
+        "message": "Wunderbar. Vielen Dank für das Gespräch. Wir werden Ihre Unterlagen prüfen und uns bei Ihnen melden.",
+        "time_in_call_secs": 64
+      }
+    ],
+    "metadata": {
+      "start_time_unix_secs": 1733404800,
+      "accepted_time_unix_secs": 1733404801,
+      "call_duration_secs": 70,
+      "cost": 1500,
+      "termination_reason": "natural end",
+      "main_language": "de"
+    },
+    "analysis": {
+      "call_successful": "success",
+      "transcript_summary": "Der Kandidat ist Student der Elektrotechnik im Abschlusssemester mit dualer Studiumserfahrung seit 2021.",
+      "call_summary_title": "Bewerbungsgespräch Projektleiter"
+    },
+    "conversation_initiation_client_data": {
+      "dynamic_variables": {
+        "candidatefirst_name": "Max",
+        "candidatelast_name": "Mustermann",
+        "companyname": "Test Company",
+        "campaignrole_title": "Projektleiter",
+        "campaignlocation_label": "Berlin",
+        "companypriorities": "Studium Elektrotechnik, Berufserfahrung, Führerschein",
+        "companypitch": "Wir suchen motivierte Projektleiter mit technischem Hintergrund."
+      }
+    }
+  }
+}
+

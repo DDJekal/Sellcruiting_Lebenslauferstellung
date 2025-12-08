@@ -1,0 +1,69 @@
+mandant_id: "kita_urban"
+protokoll_template_id: 62
+
+heuristic_rules:
+  - pattern: "nachweis.*(fortbildungen|qualifizierungen)"
+    type: "text_list"
+    confidence: 0.90
+  - pattern: "alternativ.*weiterleiten"
+    type: "routing_rule"
+    confidence: 0.93
+  - pattern: "vergütung.*(tv-l|tarif|€|euro)"
+    type: "yes_no_with_details"
+    confidence: 0.88
+  - pattern: "(vollzeit|wochenstunden|39)"
+    type: "yes_no"
+    confidence: 0.90
+
+info_page_names:
+  - "Weitere Informationen"
+  - "Zusatzinformationen"
+
+grounding:
+  vollzeit_stunden: 39
+  urlaub_tage: 30
+  tarifvertrag: "TV-L Berlin orientiert"
+
+aida_phase_mapping:
+  interest:
+    - 281  # Staatl. anerkannter Abschluss
+    - 283  # Fortbildungen
+    - 285  # Mehrjährige Berufserfahrung
+    - 287  # Leitungserfahrung
+    - 289  # Deutschkenntnisse B2
+    - 291  # Routing-Regel
+  action:
+    - 293  # Vergütung
+    - 295  # Vollzeit
+    - 297  # Urlaub
+
+must_criteria:
+  - prompt_id: 281
+    expected: true
+    error_msg: "Staatlich anerkannter sozialpädagogischer Abschluss fehlt (zwingend)"
+
+routing_rules:
+  - rule_id: "erzieher_weiterleitung"
+    target_prompt: 291
+    conditions:
+      - prompt: 281
+        field: "checked"
+        operator: "=="
+        value: true
+      - prompt: 283
+        field: "value"
+        operator: "not_contains"
+        value: "leitung"
+    action:
+      checked: true
+      notes: "AUTO: Nur Erzieher:in ohne Leitungsqualifikation → weiterleiten"
+
+implicit_defaults:
+  - prompt_id: 289
+    reasoning: "Gespräch wurde auf Deutsch geführt"
+    default_answer:
+      checked: true
+      value: "ja"
+      confidence: 0.8
+      notes: "Implizit angenommen (Gespräch auf Deutsch)"
+

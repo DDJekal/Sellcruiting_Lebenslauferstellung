@@ -1,0 +1,178 @@
+{
+    "id" : 62,
+    "name" : "Leitungskraft für unsere Kita (mwd)",
+    "created_on" : "2025-10-16T07:47:42.403060+00:00",
+    "updated_on" : "2025-10-16T07:47:42.403060+00:00",
+    "pages" : [ {
+      "id" : 87,
+      "name" : "Der Bewerber erfüllt folgende Kriterien:",
+      "position" : 1,
+      "created_on" : "2025-10-16T07:47:42.436076+00:00",
+      "updated_on" : "2025-10-16T07:48:03.741250+00:00",
+      "prompts" : [ {
+        "id" : 291,
+        "question" : "Alternativ: Erzieher:innen auch weiterleiten, dann aber mit dem Hinweis, für die stellv. Leitung nicht geeignet",
+        "information" : null,
+        "position" : 1,
+        "checked" : null,
+        "is_template" : false,
+        "created_on" : "2025-10-16T07:48:40.901549+00:00",
+        "updated_on" : "2025-10-16T07:48:40.901549+00:00",
+        "type" : "yes_no"
+      }, {
+        "id" : 289,
+        "question" : "Zwingend: Deutschkenntnisse B2",
+        "information" : null,
+        "position" : 2,
+        "checked" : null,
+        "is_template" : false,
+        "created_on" : "2025-10-16T07:48:34.901113+00:00",
+        "updated_on" : "2025-10-16T07:48:34.901113+00:00",
+        "type" : "yes_no"
+      }, {
+        "id" : 287,
+        "question" : "\r\nWünschenswert: Erfahrung in einer leitenden Stelle",
+        "information" : null,
+        "position" : 3,
+        "checked" : null,
+        "is_template" : false,
+        "created_on" : "2025-10-16T07:48:28.970341+00:00",
+        "updated_on" : "2025-10-16T07:48:28.970341+00:00",
+        "type" : "yes_no"
+      }, {
+        "id" : 285,
+        "question" : "Zwingend: mehrjährige Berufserfahrung",
+        "information" : null,
+        "position" : 4,
+        "checked" : null,
+        "is_template" : false,
+        "created_on" : "2025-10-16T07:48:21.843301+00:00",
+        "updated_on" : "2025-10-16T07:48:21.843301+00:00",
+        "type" : "yes_no"
+      }, {
+        "id" : 283,
+        "question" : "Nachweis über einschlägige Fortbildungen, Qualifizierungen",
+        "information" : null,
+        "position" : 5,
+        "checked" : null,
+        "is_template" : false,
+        "created_on" : "2025-10-16T07:48:16.528074+00:00",
+        "updated_on" : "2025-10-16T07:48:16.528074+00:00",
+        "type" : "yes_no"
+      }, {
+        "id" : 281,
+        "question" : "Zwingend: staatlich anerkannter Abschluss in einem sozialpädagogischen Beruf",
+        "information" : null,
+        "position" : 6,
+        "checked" : null,
+        "is_template" : false,
+        "created_on" : "2025-10-16T07:48:09.758550+00:00",
+        "updated_on" : "2025-10-16T07:48:09.758550+00:00",
+        "type" : "yes_no"
+      } ]
+    }, {
+      "id" : 88,
+      "name" : "Der Bewerber akzeptiert folgende Rahmenbedingungen:",
+      "position" : 2,
+      "created_on" : "2025-10-16T07:48:47.350015+00:00",
+      "updated_on" : "2025-10-16T07:48:55.067616+00:00",
+      "prompts" : [ {
+        "id" : 297,
+        "question" : "30 Tage Jahresurlaub",
+        "information" : null,
+        "position" : 1,
+        "checked" : null,
+        "is_template" : false,
+        "created_on" : "2025-10-16T07:49:16.716748+00:00",
+        "updated_on" : "2025-10-16T07:49:16.716748+00:00",
+        "type" : "yes_no"
+      }, {
+        "id" : 295,
+        "question" : "Vollzeit (39 Wochenstunden)\r\n\r\n",
+        "information" : null,
+        "position" : 2,
+        "checked" : null,
+        "is_template" : false,
+        "created_on" : "2025-10-16T07:49:09.934638+00:00",
+        "updated_on" : "2025-10-16T07:49:09.934638+00:00",
+        "type" : "yes_no"
+      }, {
+        "id" : 293,
+        "question" : "Vergütung nach Haustarif orientiert am TV-L Berlin (EG 10a) 3.475€ (Einstieg ohne einschlägige Leitungserfahrung) bis 5.259€",
+        "information" : null,
+        "position" : 3,
+        "checked" : null,
+        "is_template" : false,
+        "created_on" : "2025-10-16T07:49:01.360495+00:00",
+        "updated_on" : "2025-10-16T07:49:01.360495+00:00",
+        "type" : "yes_no"
+      } ]
+    }, {
+      "id" : 89,
+      "name" : "Weitere Informationen",
+      "position" : 3,
+      "created_on" : "2025-10-16T07:49:21.533697+00:00",
+      "updated_on" : "2025-10-16T07:49:27.939409+00:00",
+      "prompts" : [ {
+        "id" : 309,
+        "question" : "!!!Bitte unbedingt erwähnen, dass es sich um die Region \"Marzahn Hellersdorf\" handelt!!!",
+        "information" : null,
+        "position" : 1,
+        "checked" : null,
+        "is_template" : false,
+        "created_on" : "2025-10-16T07:50:14.909942+00:00",
+        "updated_on" : "2025-10-16T07:50:14.909942+00:00",
+        "type" : "info"
+      }, {
+        "id" : 307,
+        "question" : "Link zur Übersicht der Standorte: https://www.urban-consult.de/kindertagesstaetten/ ( falls der Standort nicht infrage kommt)",
+        "information" : null,
+        "position" : 2,
+        "checked" : null,
+        "is_template" : false,
+        "created_on" : "2025-10-16T07:50:07.909499+00:00",
+        "updated_on" : "2025-10-16T07:50:07.909499+00:00",
+        "type" : "info"
+      }, {
+        "id" : 305,
+        "question" : "In unseren Kindertagesstätten bieten wir Kindern im Kleinkind- und Vorschulalter einen Lern- und Lebensort, wo sie in ihrer Entwicklung einfühlsam und individuell begleitet und gefördert werden. Wir sind offen für alle Kinder – unabhängig von ihrer kulturellen Herkunft, ihrer Nationalität oder sozialen Situation, mit oder ohne Beeinträchtigung oder Behinderung.",
+        "information" : null,
+        "position" : 3,
+        "checked" : null,
+        "is_template" : false,
+        "created_on" : "2025-10-16T07:49:58.605892+00:00",
+        "updated_on" : "2025-10-16T07:49:58.605892+00:00",
+        "type" : "info"
+      }, {
+        "id" : 303,
+        "question" : "Die enge Zusammenarbeit mit den Familien ist uns ein wichtiges Anliegen. Deshalb bieten wir in Kooperation mit dem Träger FAB e. V. Familien und Alleinerziehenden mit unserem Projekt „Zukunft“ in Marzahn-Hellersdorf ein aufsuchendes Beratungs- und Unterstützungsangebot.",
+        "information" : null,
+        "position" : 4,
+        "checked" : null,
+        "is_template" : false,
+        "created_on" : "2025-10-16T07:49:49.270529+00:00",
+        "updated_on" : "2025-10-16T07:49:49.270529+00:00",
+        "type" : "info"
+      }, {
+        "id" : 301,
+        "question" : "Kita Springmäuse, Stollberger Straße 25 - 27, 12627 Berlin",
+        "information" : null,
+        "position" : 5,
+        "checked" : null,
+        "is_template" : false,
+        "created_on" : "2025-10-16T07:49:40.806370+00:00",
+        "updated_on" : "2025-10-16T07:49:40.806370+00:00",
+        "type" : "info"
+      }, {
+        "id" : 299,
+        "question" : "Ansprechpartnerin: Frau Nadine Starick",
+        "information" : null,
+        "position" : 6,
+        "checked" : null,
+        "is_template" : false,
+        "created_on" : "2025-10-16T07:49:34.748459+00:00",
+        "updated_on" : "2025-10-16T07:49:34.748459+00:00",
+        "type" : "info"
+      } ]
+    } ]
+  }

@@ -1,0 +1,36 @@
+# Auto-generated config for: Projektleiter
+# Template ID: 63
+# Generated from protocol template
+
+mandant_id: template_63
+protokoll_template_id: 63
+heuristic_rules:
+- pattern: vergütung.*(tv-l|tarif|€|euro)
+  type: yes_no_with_details
+  confidence: 0.88
+info_page_names:
+- Weitere Informationen
+grounding: {}
+aida_phase_mapping:
+  interest:
+  - 321
+  - 319
+  - 317
+  - 315
+  - 313
+  - 311
+  action:
+  - 327
+  - 325
+  - 323
+must_criteria:
+- prompt_id: 315
+  expected: true
+  error_msg: 'Zwingendes Kriterium nicht erfüllt: zwingend: min 2. Jahre Berufserfahrung
+    in Deutschland...'
+- prompt_id: 313
+  expected: true
+  error_msg: 'Zwingendes Kriterium nicht erfüllt: zwingend: Studium Elektrotechnik
+    oder in einem eng verwandte...'
+routing_rules: []
+implicit_defaults: []

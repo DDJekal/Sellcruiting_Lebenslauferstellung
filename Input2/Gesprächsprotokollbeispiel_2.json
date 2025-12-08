@@ -1,0 +1,208 @@
+{
+    "id" : 63,
+    "name" : "Projektleiter",
+    "created_on" : "2025-10-16T10:55:21.642894+00:00",
+    "updated_on" : "2025-10-16T10:55:21.642894+00:00",
+    "pages" : [ {
+      "id" : 90,
+      "name" : "Der Bewerber erfüllt folgende Kriterien:",
+      "position" : 1,
+      "created_on" : "2025-10-16T10:55:21.673908+00:00",
+      "updated_on" : "2025-10-16T10:55:45.082875+00:00",
+      "prompts" : [ {
+        "id" : 321,
+        "question" : "wünschenswert: Führerschein",
+        "information" : null,
+        "position" : 1,
+        "checked" : null,
+        "is_template" : false,
+        "created_on" : "2025-10-16T10:56:22.823224+00:00",
+        "updated_on" : "2025-10-16T10:56:22.823224+00:00",
+        "type" : "yes_no"
+      }, {
+        "id" : 319,
+        "question" : "alternativ: Ausbildung zur Elektrofachkraft (m/w/d)",
+        "information" : null,
+        "position" : 2,
+        "checked" : null,
+        "is_template" : false,
+        "created_on" : "2025-10-16T10:56:17.089591+00:00",
+        "updated_on" : "2025-10-16T10:56:17.089591+00:00",
+        "type" : "yes_no"
+      }, {
+        "id" : 317,
+        "question" : "alternativ: Ausbildung zum Elektriker/ Elektrotechniker/ Elektroniker (m/w/d)",
+        "information" : null,
+        "position" : 3,
+        "checked" : null,
+        "is_template" : false,
+        "created_on" : "2025-10-16T10:56:11.510874+00:00",
+        "updated_on" : "2025-10-16T10:56:11.510874+00:00",
+        "type" : "yes_no"
+      }, {
+        "id" : 315,
+        "question" : "zwingend: min 2. Jahre Berufserfahrung in Deutschland",
+        "information" : null,
+        "position" : 4,
+        "checked" : null,
+        "is_template" : false,
+        "created_on" : "2025-10-16T10:56:05.439018+00:00",
+        "updated_on" : "2025-10-16T10:56:05.439018+00:00",
+        "type" : "yes_no"
+      }, {
+        "id" : 313,
+        "question" : "zwingend: Studium Elektrotechnik oder in einem eng verwandten Bereich",
+        "information" : null,
+        "position" : 5,
+        "checked" : null,
+        "is_template" : false,
+        "created_on" : "2025-10-16T10:55:59.411580+00:00",
+        "updated_on" : "2025-10-16T10:55:59.411580+00:00",
+        "type" : "yes_no"
+      }, {
+        "id" : 311,
+        "question" : "Deutsch B2",
+        "information" : null,
+        "position" : 6,
+        "checked" : null,
+        "is_template" : false,
+        "created_on" : "2025-10-16T10:55:53.325668+00:00",
+        "updated_on" : "2025-10-16T10:55:53.325668+00:00",
+        "type" : "yes_no"
+      } ]
+    }, {
+      "id" : 91,
+      "name" : "Der Bewerber akzeptiert folgende Rahmenbedingungen:",
+      "position" : 2,
+      "created_on" : "2025-10-16T10:56:27.081505+00:00",
+      "updated_on" : "2025-10-16T10:56:35.589419+00:00",
+      "prompts" : [ {
+        "id" : 327,
+        "question" : "Unbefristeter Arbeitsvertrag bei einem zuverlässigen Arbeitgeber",
+        "information" : null,
+        "position" : 1,
+        "checked" : null,
+        "is_template" : false,
+        "created_on" : "2025-10-16T10:56:56.849907+00:00",
+        "updated_on" : "2025-10-16T10:56:56.849907+00:00",
+        "type" : "yes_no"
+      }, {
+        "id" : 325,
+        "question" : "Attraktives Grundgehalt plus leistungsabhängige Erfolgsbeteiligung möglich( Gaber zahlt min. 10 % mehr als der jetzige Arbeitgeber!",
+        "information" : null,
+        "position" : 2,
+        "checked" : null,
+        "is_template" : false,
+        "created_on" : "2025-10-16T10:56:49.713661+00:00",
+        "updated_on" : "2025-10-16T10:56:49.713661+00:00",
+        "type" : "yes_no"
+      }, {
+        "id" : 323,
+        "question" : "Vollzeit",
+        "information" : null,
+        "position" : 3,
+        "checked" : null,
+        "is_template" : false,
+        "created_on" : "2025-10-16T10:56:41.927460+00:00",
+        "updated_on" : "2025-10-16T10:56:41.927460+00:00",
+        "type" : "yes_no"
+      } ]
+    }, {
+      "id" : 92,
+      "name" : "Weitere Informationen",
+      "position" : 3,
+      "created_on" : "2025-10-16T10:57:15.493804+00:00",
+      "updated_on" : "2025-10-16T10:57:23.474488+00:00",
+      "prompts" : [ {
+        "id" : 345,
+        "question" : "kein Fremdfinanziertes Unternhemen - stehen sicher am Markt und finanzieren sich aus eigener Kraft (nicht wie viele andere Unternehmen im Energiebereich die sich groß präsentieren, aber dann schnell wieder abstürzen",
+        "information" : null,
+        "position" : 1,
+        "checked" : null,
+        "is_template" : false,
+        "created_on" : "2025-10-16T10:58:23.753935+00:00",
+        "updated_on" : "2025-10-16T10:58:23.753935+00:00",
+        "type" : "info"
+      }, {
+        "id" : 343,
+        "question" : "breit aufgestellt Einsatzfelder: Photov., Windkraft, Unternehmen, Netzbetreiber, E-Mobilität (Ladesationen)",
+        "information" : null,
+        "position" : 2,
+        "checked" : null,
+        "is_template" : false,
+        "created_on" : "2025-10-16T10:58:16.532313+00:00",
+        "updated_on" : "2025-10-16T10:58:16.532313+00:00",
+        "type" : "info"
+      }, {
+        "id" : 341,
+        "question" : "Full-Service-Unternehmen: übernehemen jeden Schritt beim Kunden von Anschluss und Transport bis zu den regelmäßigen Wartungen am Ende",
+        "information" : null,
+        "position" : 3,
+        "checked" : null,
+        "is_template" : false,
+        "created_on" : "2025-10-16T10:58:10.007475+00:00",
+        "updated_on" : "2025-10-16T10:58:10.007475+00:00",
+        "type" : "info"
+      }, {
+        "id" : 339,
+        "question" : "große Solarparks und nicht nur eine kleine Photov. Anlage aufs Dach (Also punkt 1 große Projekte)",
+        "information" : null,
+        "position" : 4,
+        "checked" : null,
+        "is_template" : false,
+        "created_on" : "2025-10-16T10:58:02.714066+00:00",
+        "updated_on" : "2025-10-16T10:58:02.714066+00:00",
+        "type" : "info"
+      }, {
+        "id" : 337,
+        "question" : "seit 1995: Traditionsunternehmen",
+        "information" : null,
+        "position" : 5,
+        "checked" : null,
+        "is_template" : false,
+        "created_on" : "2025-10-16T10:57:55.110972+00:00",
+        "updated_on" : "2025-10-16T10:57:55.110972+00:00",
+        "type" : "info"
+      }, {
+        "id" : 335,
+        "question" : "deutsche Qualität: Produktion in DE (schnelle Lieferzeiten+Kompatibel in allen deutschen Mittelspannungnetzen)",
+        "information" : null,
+        "position" : 6,
+        "checked" : null,
+        "is_template" : false,
+        "created_on" : "2025-10-16T10:57:49.079648+00:00",
+        "updated_on" : "2025-10-16T10:57:49.079648+00:00",
+        "type" : "info"
+      }, {
+        "id" : 333,
+        "question" : "stehen für nachhaltige Zukunft und erneubare Energien",
+        "information" : null,
+        "position" : 7,
+        "checked" : null,
+        "is_template" : false,
+        "created_on" : "2025-10-16T10:57:43.085361+00:00",
+        "updated_on" : "2025-10-16T10:57:43.085361+00:00",
+        "type" : "info"
+      }, {
+        "id" : 331,
+        "question" : "Standort: Am Fichtenkamp 7-9 Bünde",
+        "information" : null,
+        "position" : 8,
+        "checked" : null,
+        "is_template" : false,
+        "created_on" : "2025-10-16T10:57:34.721549+00:00",
+        "updated_on" : "2025-10-16T10:57:34.721549+00:00",
+        "type" : "info"
+      }, {
+        "id" : 329,
+        "question" : "AP : Hergert hergert@faber-etec.de",
+        "information" : null,
+        "position" : 9,
+        "checked" : null,
+        "is_template" : false,
+        "created_on" : "2025-10-16T10:57:28.805054+00:00",
+        "updated_on" : "2025-10-16T10:57:28.805054+00:00",
+        "type" : "info"
+      } ]
+    } ]
+  }
