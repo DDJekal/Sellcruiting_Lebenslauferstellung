@@ -1,9 +1,14 @@
+# Core dependencies
 openai==1.54.0
 pydantic==2.9.0
 python-dotenv==1.0.0
 pyyaml==6.0.2
+
+# Temporal parsing
 dateparser>=1.2.0
 python-dateutil>=2.8.2
+
+# MCP (optional)
 anthropic>=0.40.0
 
 # Web Server & API
