@@ -192,6 +192,6 @@ if __name__ == "__main__":
         "webhook_server:app",
         host="0.0.0.0",
         port=port,
-        reload=True  # Only for development
+        reload=False  # No reload in production
     )
 
