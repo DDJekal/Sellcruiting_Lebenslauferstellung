@@ -4,7 +4,7 @@ from typing import Dict, Any, List
 from pathlib import Path
 import yaml
 
-from .models import PromptType
+from models import PromptType
 
 
 class ConfigGenerator:

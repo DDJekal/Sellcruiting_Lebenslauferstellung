@@ -1,7 +1,7 @@
 """Validator for checking must-criteria and applying routing rules."""
 from typing import List, Dict, Any
 
-from .models import FilledProtocol, MandantenConfig, PromptAnswer, Evidence
+from models import FilledProtocol, MandantenConfig, PromptAnswer, Evidence
 
 
 class Validator:

@@ -5,7 +5,7 @@ from typing import Dict, List, Any
 import os
 from openai import OpenAI
 
-from .models import ShadowType, PromptType, MandantenConfig
+from models import ShadowType, PromptType, MandantenConfig
 
 
 class TypeEnricher:

@@ -1,7 +1,7 @@
 """Mapper for mapping extracted answers to protocol structure."""
 from typing import Dict, Any, List
 
-from .models import (
+from models import (
     ShadowType, PromptAnswer, FilledPrompt, FilledPage, FilledProtocol
 )
 

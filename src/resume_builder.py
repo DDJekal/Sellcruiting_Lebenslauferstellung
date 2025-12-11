@@ -6,7 +6,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 from openai import OpenAI
 
-from .models import (
+from models import (
     ApplicantResume, Applicant, Resume, 
     Experience, Education
 )
