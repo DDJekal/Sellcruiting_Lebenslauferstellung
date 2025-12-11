@@ -1,0 +1,12 @@
+# Ignore local virtual environments
+venv/
+.venv/
+__pycache__/
+
+# Ignore test outputs
+Output/*.json
+
+# Ignore development files
+.env
+*.log
+
