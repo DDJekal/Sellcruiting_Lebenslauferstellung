@@ -5,7 +5,7 @@ services:
     region: frankfurt
     plan: starter
     buildCommand: pip install --upgrade pip && pip install -r requirements.txt
-    startCommand: python webhook_server.py
+    startCommand: cd .. && python webhook_server.py
     envVars:
       # OpenAI API (required)
       - key: OPENAI_API_KEY
