@@ -5,16 +5,16 @@ from pathlib import Path
 from typing import Dict, Any
 from datetime import datetime
 
-from src.elevenlabs_transformer import ElevenLabsTransformer
-from src.temporal_enricher import TemporalEnricher
-from src.type_enricher import TypeEnricher
-from src.config_parser import ConfigParser
-from src.config_generator import ConfigGenerator
-from src.extractor import Extractor
-from src.mapper import Mapper
-from src.validator import Validator
-from src.resume_builder import ResumeBuilder
-from src.models import MandantenConfig
+from elevenlabs_transformer import ElevenLabsTransformer
+from temporal_enricher import TemporalEnricher
+from type_enricher import TypeEnricher
+from config_parser import ConfigParser
+from config_generator import ConfigGenerator
+from extractor import Extractor
+from mapper import Mapper
+from validator import Validator
+from resume_builder import ResumeBuilder
+from models import MandantenConfig
 
 
 def process_elevenlabs_call(webhook_data: Dict[str, Any]) -> Dict[str, Any]:
