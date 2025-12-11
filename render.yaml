@@ -40,4 +40,3 @@ services:
     
     # Auto-deploy on push
     autoDeploy: true
-
