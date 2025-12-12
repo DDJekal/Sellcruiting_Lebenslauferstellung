@@ -16,15 +16,15 @@ class QuestionnaireClient:
         
         Args:
             api_base_url: Base URL of the API (e.g., "https://api.example.com")
-            api_key: API key for authentication (WEBHOOK_API_KEY)
+            api_key: API key for authentication (HIRING_API_TOKEN)
         """
         self.api_base_url = api_base_url or os.getenv("HIRINGS_API_URL", "").rstrip("/")
-        self.api_key = api_key or os.getenv("WEBHOOK_API_KEY")
+        self.api_key = api_key or os.getenv("HIRING_API_TOKEN")
         
         if not self.api_base_url:
             raise ValueError("HIRINGS_API_URL not configured")
         if not self.api_key:
-            raise ValueError("WEBHOOK_API_KEY not configured")
+            raise ValueError("HIRING_API_TOKEN not configured")
     
     async def get_questionnaire(self, campaign_id: str) -> Dict[str, Any]:
         """

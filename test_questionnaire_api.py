@@ -25,7 +25,7 @@ def test_questionnaire_api():
     
     # Check environment variables
     api_url = os.getenv("HIRINGS_API_URL")
-    api_key = os.getenv("WEBHOOK_API_KEY")
+    api_key = os.getenv("HIRING_API_TOKEN")
     
     if not api_url:
         print("❌ HIRINGS_API_URL not set in environment")
@@ -33,7 +33,7 @@ def test_questionnaire_api():
         return False
     
     if not api_key:
-        print("❌ WEBHOOK_API_KEY not set in environment")
+        print("❌ HIRING_API_TOKEN not set in environment")
         print("   Please set in .env or Render dashboard")
         return False
     
