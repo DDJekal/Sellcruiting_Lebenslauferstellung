@@ -2,7 +2,7 @@
 from typing import Dict, Any, List
 
 from models import (
-    ShadowType, PromptAnswer, FilledPrompt, FilledPage, FilledProtocol
+    ShadowType, PromptAnswer, FilledPrompt, FilledPage, FilledProtocol, PromptType
 )
 
 
@@ -29,7 +29,6 @@ class Mapper:
                 if not shadow_type:
                     # Prompt has no shadow type (shouldn't happen, but handle gracefully)
                     # Create a default one
-                    from .models import PromptType
                     shadow_type = ShadowType(
                         prompt_id=prompt_id,
                         inferred_type=PromptType.TEXT,
@@ -44,7 +43,6 @@ class Mapper:
                 )
                 
                 # For yes_no prompts: set value to "ja"/"nein" based on checked
-                from .models import PromptType
                 if shadow_type.inferred_type == PromptType.YES_NO:
                     if answer.checked is True:
                         answer.value = "ja"
