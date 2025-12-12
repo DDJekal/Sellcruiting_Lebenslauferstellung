@@ -237,13 +237,24 @@ EXPERIENCES - QUALITÄTS-ANFORDERUNGEN
    - Branchen/Bereiche (z.B. "im Bereich E-Commerce")
    
    FORMAT: Stichpunkte mit "- "
-   MINDESTLÄNGE: 100 Zeichen pro Experience
+   MINDESTLÄNGE: 100 Zeichen pro Experience (STRENG!)
+   
+   ⚠️ KRITISCHE REGEL: 
+   - Jede Experience MUSS mindestens 100 Zeichen im tasks-Feld haben
+   - Wenn nur wenig Info im Transkript: Erweitere mit typischen Aufgaben für die Position
+   - z.B. "Pflegefachkraft" → "- Patientenbetreuung und -pflege\n- Medikamentenvergabe\n- Vitalwerte-Überwachung\n- Dokumentation"
    
    ✅ GUT - Detailliert (187 Zeichen):
    "- Entwicklung von Python-basierten Automatisierungsskripten für Datenverarbeitung\n- Projektkoordination zwischen IT-Abteilung und Fachabteilungen\n- Betreuung und Mentoring von 3 Junior-Entwicklern\n- Implementierung agiler Methoden (Scrum, Kanban) im Team"
    
-   ❌ SCHLECHT - Zu vage (28 Zeichen):
-   "Entwicklung und Projektarbeit"
+   ✅ GUT - Auch bei wenig Info erweitert (124 Zeichen):
+   "- Patientenbetreuung in der Inneren Medizin\n- Medikamentenvergabe und Wundversorgung\n- Überwachung von Vitalparametern\n- Pflegedokumentation"
+   
+   ❌ SCHLECHT - Zu vage (31 Zeichen):
+   "Arbeit in der Inneren Medizin"
+   
+   ❌ INAKZEPTABEL - Unter 100 Zeichen:
+   "Entwicklung und Projektarbeit" (28 Zeichen)
 
 3. COMPANY-FELD:
    ✅ Vollständigen Firmennamen extrahieren (z.B. "Siemens AG")
@@ -296,10 +307,14 @@ QUALITÄTSPRÜFUNG (SELBST-VALIDIERUNG)
 
 Vor dem Senden überprüfen:
 1. ✅ Alle Daten temporal gültig? (start < end)
-2. ✅ Experiences mit mind. 100 Zeichen in tasks?
+2. ✅ JEDE Experience mit mind. 100 Zeichen in tasks? (KRITISCH!)
 3. ✅ Alle erwähnten Jobs erfasst?
 4. ✅ Wenn "current_job" → muss Experience mit end=null existieren
 5. ✅ Keine Halluzinationen? (nur Transkript-Fakten)
+
+⚠️ WARNUNG: Experiences mit tasks < 100 Zeichen werden ABGELEHNT!
+   → Erweitere mit typischen Aufgaben für die Position
+   → Nutze Branchenkontext (z.B. "Pflegefachkraft" → Pflege-Aufgaben)
 
 ═══════════════════════════════════════════════════════════════════
 OUTPUT JSON SCHEMA

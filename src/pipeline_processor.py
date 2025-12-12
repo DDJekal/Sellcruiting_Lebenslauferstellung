@@ -217,8 +217,8 @@ def process_elevenlabs_call(webhook_data: Dict[str, Any]) -> Dict[str, Any]:
         "resume_id": applicant_resume.resume.id,
         "applicant": applicant_resume.applicant.model_dump(),
         "resume": applicant_resume.resume.model_dump(),
-        "protocol": protocol_minimal,  # Return minimal protocol
-        "metadata": metadata_output,    # Return metadata separately
+        "protocol_minimal": protocol_minimal,  # Minimal protocol for HOC (checked only)
+        "metadata": metadata_output,           # Full metadata for HOC
         "experiences_count": len(applicant_resume.resume.experiences),
         "educations_count": len(applicant_resume.resume.educations),
         "timestamp": datetime.utcnow().isoformat(),

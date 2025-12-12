@@ -64,14 +64,18 @@ class HOCClient:
         """
         Prepare payload in HOC's expected format.
         
-        TODO: Adjust this based on actual HOC API specification.
+        Sends:
+        - applicant: Personal data (id, name, email, phone, postal_code)
+        - resume: Complete CV (experiences, educations, motivation, expectations, etc.)
+        - protocol: Minimal protocol (only 'checked' status)
+        - metadata: ElevenLabs data, temporal context, processing info
         """
-        # Current format matches the example structure provided
-        # Adjust if HOC expects different field names/structure
         
         return {
-            "applicant": data["applicant"],
-            "resume": data["resume"]
+            "applicant": data.get("applicant", {}),
+            "resume": data.get("resume", {}),
+            "protocol": data.get("protocol_minimal", data.get("protocol", {})),  # Minimal protocol (checked only)
+            "metadata": data.get("metadata", {})  # Full metadata
         }
 
 
