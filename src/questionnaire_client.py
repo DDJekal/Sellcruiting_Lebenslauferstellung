@@ -39,7 +39,7 @@ class QuestionnaireClient:
         Raises:
             httpx.HTTPError: If request fails
         """
-        url = f"{self.api_base_url}/api/v1/questionnaire/{campaign_id}"
+        url = f"{self.api_base_url}/questionnaire/{campaign_id}"
         
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -78,7 +78,7 @@ class QuestionnaireClient:
         Returns:
             Protocol/Questionnaire JSON structure
         """
-        url = f"{self.api_base_url}/api/v1/questionnaire/{campaign_id}"
+        url = f"{self.api_base_url}/questionnaire/{campaign_id}"
         
         headers = {
             "Authorization": f"Bearer {self.api_key}",

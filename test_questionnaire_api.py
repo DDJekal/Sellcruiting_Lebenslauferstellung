@@ -4,6 +4,12 @@ import sys
 import json
 from pathlib import Path
 
+# Fix Windows console encoding
+if sys.platform == "win32":
+    import codecs
+    sys.stdout = codecs.getwriter("utf-8")(sys.stdout.buffer, errors="replace")
+    sys.stderr = codecs.getwriter("utf-8")(sys.stderr.buffer, errors="replace")
+
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
