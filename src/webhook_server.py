@@ -181,6 +181,201 @@ async def test_pipeline(request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/debug/files")
+async def list_files():
+    """
+    Liste alle gespeicherten Output-Dateien.
+    
+    Returns:
+        - protocols: Liste aller Protocol-Dateien
+        - resumes: Liste aller Resume-Dateien
+        - total_count: Gesamtanzahl der Dateien
+    """
+    try:
+        output_dir = Path("Output")
+        
+        if not output_dir.exists():
+            return {
+                "protocols": [],
+                "resumes": [],
+                "total_count": 0,
+                "message": "Output directory does not exist yet"
+            }
+        
+        # Sammle alle Dateien
+        protocol_files = []
+        resume_files = []
+        
+        for file in output_dir.glob("*.json"):
+            file_stat = file.stat()
+            file_info = {
+                "filename": file.name,
+                "size_bytes": file_stat.st_size,
+                "created_at": datetime.fromtimestamp(file_stat.st_ctime).isoformat(),
+                "modified_at": datetime.fromtimestamp(file_stat.st_mtime).isoformat()
+            }
+            
+            if file.name.startswith("filled_protocol_"):
+                # Extrahiere conversation_id
+                conv_id = file.name.replace("filled_protocol_", "").replace(".json", "")
+                file_info["conversation_id"] = conv_id
+                protocol_files.append(file_info)
+            elif file.name.startswith("resume_"):
+                # Extrahiere applicant_id
+                applicant_id = file.name.replace("resume_", "").replace(".json", "")
+                file_info["applicant_id"] = applicant_id
+                resume_files.append(file_info)
+        
+        # Sortiere nach Erstellungsdatum (neueste zuerst)
+        protocol_files.sort(key=lambda x: x["created_at"], reverse=True)
+        resume_files.sort(key=lambda x: x["created_at"], reverse=True)
+        
+        return {
+            "protocols": protocol_files,
+            "resumes": resume_files,
+            "total_count": len(protocol_files) + len(resume_files),
+            "output_directory": str(output_dir.absolute())
+        }
+        
+    except Exception as e:
+        logger.error(f"Error listing files: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/debug/files/{filename}")
+async def get_file(filename: str):
+    """
+    Hole eine spezifische Output-Datei.
+    
+    Args:
+        filename: Name der Datei (z.B. "resume_89778.json")
+    
+    Returns:
+        JSON-Inhalt der Datei
+    """
+    try:
+        # Sicherheit: Verhindere Directory Traversal
+        if ".." in filename or "/" in filename or "\\" in filename:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid filename: path traversal not allowed"
+            )
+        
+        # Nur .json Dateien erlauben
+        if not filename.endswith(".json"):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid filename: only .json files allowed"
+            )
+        
+        file_path = Path("Output") / filename
+        
+        if not file_path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=f"File not found: {filename}"
+            )
+        
+        # Lade und returniere Datei
+        with open(file_path, 'r', encoding='utf-8') as f:
+            file_content = json.load(f)
+        
+        # Füge Metadaten hinzu
+        file_stat = file_path.stat()
+        
+        return {
+            "filename": filename,
+            "size_bytes": file_stat.st_size,
+            "created_at": datetime.fromtimestamp(file_stat.st_ctime).isoformat(),
+            "modified_at": datetime.fromtimestamp(file_stat.st_mtime).isoformat(),
+            "content": file_content
+        }
+        
+    except HTTPException:
+        raise
+    except json.JSONDecodeError:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Invalid JSON in file: {filename}"
+        )
+    except Exception as e:
+        logger.error(f"Error reading file {filename}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/debug/conversations")
+async def list_conversations():
+    """
+    Liste alle verarbeiteten Conversations mit zugehörigen Dateien.
+    
+    Returns:
+        Liste von Conversations mit Protocol + Resume
+    """
+    try:
+        output_dir = Path("Output")
+        
+        if not output_dir.exists():
+            return {
+                "conversations": [],
+                "total_count": 0
+            }
+        
+        # Sammle alle Protocol-Dateien (diese haben conversation_id)
+        conversations = []
+        
+        for protocol_file in output_dir.glob("filled_protocol_*.json"):
+            conv_id = protocol_file.name.replace("filled_protocol_", "").replace(".json", "")
+            
+            # Lade Protocol um applicant_id zu extrahieren
+            try:
+                with open(protocol_file, 'r', encoding='utf-8') as f:
+                    protocol_data = json.load(f)
+                
+                # Finde zugehöriges Resume (falls vorhanden)
+                resume_file = None
+                applicant_id = None
+                
+                # Suche in elevenlabs_metadata oder direkt im protocol
+                if "elevenlabs_metadata" in protocol_data:
+                    # Versuche applicant_id zu finden (wird nicht im protocol gespeichert)
+                    pass
+                
+                # Suche Resume-Datei durch Timestamp-Matching
+                protocol_time = protocol_file.stat().st_ctime
+                for resume in output_dir.glob("resume_*.json"):
+                    resume_time = resume.stat().st_ctime
+                    # Wenn innerhalb von 5 Sekunden erstellt -> gehört zusammen
+                    if abs(protocol_time - resume_time) < 5:
+                        resume_file = resume.name
+                        applicant_id = resume.name.replace("resume_", "").replace(".json", "")
+                        break
+                
+                conversations.append({
+                    "conversation_id": conv_id,
+                    "applicant_id": applicant_id,
+                    "protocol_file": protocol_file.name,
+                    "resume_file": resume_file,
+                    "created_at": datetime.fromtimestamp(protocol_time).isoformat(),
+                    "metadata": protocol_data.get("elevenlabs_metadata", {})
+                })
+                
+            except Exception as e:
+                logger.warning(f"Error reading protocol {protocol_file.name}: {e}")
+                continue
+        
+        # Sortiere nach Datum (neueste zuerst)
+        conversations.sort(key=lambda x: x["created_at"], reverse=True)
+        
+        return {
+            "conversations": conversations,
+            "total_count": len(conversations)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error listing conversations: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 if __name__ == "__main__":
     import uvicorn
     
