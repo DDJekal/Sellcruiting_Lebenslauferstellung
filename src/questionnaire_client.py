@@ -42,7 +42,7 @@ class QuestionnaireClient:
         url = f"{self.api_base_url}/questionnaire/{campaign_id}"
         
         headers = {
-            "Authorization": f"Bearer {self.api_key}",
+            "Authorization": self.api_key,  # Direct token, no Bearer prefix
             "Content-Type": "application/json"
         }
         
@@ -81,7 +81,7 @@ class QuestionnaireClient:
         url = f"{self.api_base_url}/questionnaire/{campaign_id}"
         
         headers = {
-            "Authorization": f"Bearer {self.api_key}",
+            "Authorization": self.api_key,  # Direct token, no Bearer prefix
             "Content-Type": "application/json"
         }
         

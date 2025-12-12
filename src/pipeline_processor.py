@@ -16,6 +16,7 @@ from mapper import Mapper
 from validator import Validator
 from resume_builder import ResumeBuilder
 from questionnaire_client import QuestionnaireClient
+from questionnaire_transformer import QuestionnaireTransformer
 from models import MandantenConfig
 
 logger = logging.getLogger(__name__)
@@ -57,9 +58,14 @@ def process_elevenlabs_call(webhook_data: Dict[str, Any]) -> Dict[str, Any]:
         # Try to fetch questionnaire from API
         try:
             questionnaire_client = QuestionnaireClient()
-            protocol = questionnaire_client.get_questionnaire_sync(campaign_id)
+            api_questionnaire = questionnaire_client.get_questionnaire_sync(campaign_id)
+            
+            # Transform API format to internal format
+            transformer = QuestionnaireTransformer()
+            protocol = transformer.transform(api_questionnaire, campaign_id=campaign_id)
+            
             protocol_source = f"api_campaign_{campaign_id}"
-            logger.info(f"Loaded protocol from API for campaign_id={campaign_id}")
+            logger.info(f"Loaded and transformed protocol from API for campaign_id={campaign_id}")
         except Exception as e:
             logger.warning(f"Failed to fetch questionnaire from API for campaign {campaign_id}: {e}")
             logger.info("Falling back to local protocol template")

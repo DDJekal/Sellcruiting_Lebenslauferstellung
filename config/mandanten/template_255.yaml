@@ -1,0 +1,15 @@
+# Auto-generated config for: Protokoll - Standort
+# Template ID: 255
+# Generated from protocol template
+
+mandant_id: template_255
+protokoll_template_id: 255
+heuristic_rules: []
+info_page_names: []
+grounding: {}
+aida_phase_mapping:
+  interest: []
+  action: []
+must_criteria: []
+routing_rules: []
+implicit_defaults: []
