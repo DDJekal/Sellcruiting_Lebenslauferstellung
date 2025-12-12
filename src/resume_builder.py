@@ -149,7 +149,7 @@ class ResumeBuilder:
                     id=i,
                     start=exp.get('start'),
                     end=exp.get('end'),
-                    company=exp.get('company', ''),
+                    company=exp.get('company') or None,  # Explicitly allow None
                     tasks=exp.get('tasks', '')
                 ))
             
@@ -159,7 +159,7 @@ class ResumeBuilder:
                 educations.append(Education(
                     id=i,
                     end=edu.get('end'),
-                    company=edu.get('company', ''),
+                    company=edu.get('company') or None,  # Explicitly allow None
                     description=edu.get('description', '')
                 ))
             
@@ -195,40 +195,116 @@ class ResumeBuilder:
 AUFGABE:
 Extrahiere aus dem deutschen Transkript alle relevanten Lebenslaufdaten und gib sie als strukturiertes JSON zurück.
 
-WICHTIG - TEMPORALE ANNOTATIONEN:
-- Das Transkript enthält temporale Annotationen in eckigen Klammern: [≈2021, vor 3 J]
-- Nutze diese Annotationen für präzise Datumsangaben
-- Konvertiere relative Zeitangaben zu ISO-Daten (YYYY-MM-DD)
-- Bei "seit X" ohne Enddatum: end = null (bedeutet "bis heute")
+═══════════════════════════════════════════════════════════════════
+TEMPORALE REGELN (HÖCHSTE PRIORITÄT)
+═══════════════════════════════════════════════════════════════════
 
-FELDER:
-- preferred_contact_time: Bevorzugte Erreichbarkeit (z.B. "Abends (18:00-21:00)")
-- preferred_workload: "Full-time", "Part-time", "Flexible", etc.
-- willing_to_relocate: "ja", "nein", oder null
+1. ANNOTATIONEN NUTZEN:
+   - Das Transkript enthält temporale Annotationen: [≈2021, vor 3 J]
+   - Diese haben HÖCHSTE PRIORITÄT für Datumsangaben
+
+2. FORMATIERUNG:
+   - "seit 2021" → start: "2021-01-01", end: null
+   - "von 2019 bis 2023" → start: "2019-01-01", end: "2023-12-31"
+   - "vor 3 Jahren [≈2021]" → start: "2021-01-01"
+   - "Mitte 2020" → "2020-06-01"
+   - "Ende 2022" → "2022-12-01"
+   - "Anfang 2019" → "2019-01-01"
+   - "noch bis 2025" → end: "2025-12-31"
+
+3. VALIDIERUNG (KRITISCH):
+   - start muss IMMER vor end liegen
+   - Bei ungültigen Daten: null verwenden + NOTE
+   - Keine Überlappungen bei Vollzeitjobs
+   - Experiences chronologisch (neueste zuerst)
+
+═══════════════════════════════════════════════════════════════════
+EXPERIENCES - QUALITÄTS-ANFORDERUNGEN
+═══════════════════════════════════════════════════════════════════
+
+1. VOLLSTÄNDIGKEIT:
+   ✅ Durchsuche GESAMTES Transkript systematisch
+   ✅ Jede erwähnte Position ist eine Experience
+   ✅ Auch kurze Praktika/Nebenjobs/Werkstudententätigkeit
+   ✅ Chronologisch sortieren (neueste zuerst)
+
+2. TASKS-FELD - DETAILLIERT (MINIMUM 100 ZEICHEN):
+   Extrahiere und strukturiere:
+   - Konkrete Aufgaben (z.B. "Kundenberatung", "Projektleitung")
+   - Technologien/Tools (z.B. "Python", "SAP", "Excel")
+   - Verantwortungsbereiche (z.B. "Team von 5 Personen")
+   - Errungenschaften (z.B. "Umsatzsteigerung um 20%")
+   - Branchen/Bereiche (z.B. "im Bereich E-Commerce")
+   
+   FORMAT: Stichpunkte mit "- "
+   MINDESTLÄNGE: 100 Zeichen pro Experience
+   
+   ✅ GUT - Detailliert (187 Zeichen):
+   "- Entwicklung von Python-basierten Automatisierungsskripten für Datenverarbeitung\n- Projektkoordination zwischen IT-Abteilung und Fachabteilungen\n- Betreuung und Mentoring von 3 Junior-Entwicklern\n- Implementierung agiler Methoden (Scrum, Kanban) im Team"
+   
+   ❌ SCHLECHT - Zu vage (28 Zeichen):
+   "Entwicklung und Projektarbeit"
+
+3. COMPANY-FELD:
+   ✅ Vollständigen Firmennamen extrahieren (z.B. "Siemens AG")
+   ❌ Bei unklarem Namen: null (nicht raten!)
+
+4. BEISPIEL VOLLSTÄNDIGE EXPERIENCE:
+{
+  "start": "2021-01-01",
+  "end": null,
+  "company": "Siemens AG",
+  "tasks": "- Entwicklung von Python-basierten Automatisierungsskripten für Datenanalyse und Reporting\n- Projektkoordination zwischen IT-Abteilung und Fachabteilungen im Bereich Industrie 4.0\n- Betreuung und Mentoring von 3 Junior-Entwicklern im agilen Team\n- Implementierung von Scrum und Kanban für effizientere Arbeitsabläufe\n- Durchführung von Code-Reviews und Qualitätssicherung"
+}
+
+═══════════════════════════════════════════════════════════════════
+EDUCATIONS - VOLLSTÄNDIGKEIT
+═══════════════════════════════════════════════════════════════════
+
+1. ALLE AUSBILDUNGEN ERFASSEN:
+   - Studium (Bachelor, Master, Diplom)
+   - Berufsausbildung
+   - Weiterbildungen/Zertifikate
+   - Kurse (wenn relevant)
+
+2. DESCRIPTION-FELD:
+   ✅ "Bachelor of Science Informatik"
+   ✅ "Ausbildung zum Fachinformatiker Systemintegration"
+   ✅ "Zertifizierung: AWS Solutions Architect"
+   ❌ "Studium" (zu vage)
+
+3. COMPANY-FELD:
+   - Vollständiger Institutionsname
+   - z.B. "TU München", "IHK Berlin", "Coursera"
+
+═══════════════════════════════════════════════════════════════════
+WEITERE FELDER
+═══════════════════════════════════════════════════════════════════
+
+- preferred_contact_time: z.B. "Abends (18:00-21:00)", "Werktags ab 17 Uhr"
+- preferred_workload: "Vollzeit (40h)", "Teilzeit (30h)", "Flexible Arbeitszeit"
+- willing_to_relocate: "ja", "nein", oder null (wenn nicht erwähnt)
 - earliest_start: Frühester Starttermin (ISO-Date oder null)
-- current_job: Aktuelle Position und Firma
-- motivation: Motivation für den Wechsel (Stichpunkte mit -)
-- expectations: Erwartungen an neuen Arbeitgeber (Stichpunkte mit -)
-- start: Gewünschtes Startdatum (ISO-Date)
-- experiences: Array von Berufserfahrungen
-- educations: Array von Ausbildungen/Qualifikationen
+- current_job: z.B. "Software-Entwickler bei Siemens AG" (Position + Firma)
+- motivation: Stichpunkte mit "- " (z.B. "- Mehr Verantwortung\n- Bessere Work-Life-Balance")
+- expectations: Stichpunkte mit "- " (z.B. "- Homeoffice-Möglichkeit\n- Weiterbildungsbudget")
+- start: Gewünschtes Startdatum (ISO-Date oder null)
 
-EXPERIENCES Format:
-{
-  "start": "YYYY-MM-DD" oder null,
-  "end": "YYYY-MM-DD" oder null (null = aktuell),
-  "company": "Firmenname",
-  "tasks": "Detaillierte Beschreibung der Aufgaben und Verantwortlichkeiten"
-}
+═══════════════════════════════════════════════════════════════════
+QUALITÄTSPRÜFUNG (SELBST-VALIDIERUNG)
+═══════════════════════════════════════════════════════════════════
 
-EDUCATIONS Format:
-{
-  "end": "YYYY-MM-DD" oder null,
-  "company": "Institution/Organisation",
-  "description": "Abschluss, Qualifikation oder Kursname"
-}
+Vor dem Senden überprüfen:
+1. ✅ Alle Daten temporal gültig? (start < end)
+2. ✅ Experiences mit mind. 100 Zeichen in tasks?
+3. ✅ Alle erwähnten Jobs erfasst?
+4. ✅ Wenn "current_job" → muss Experience mit end=null existieren
+5. ✅ Keine Halluzinationen? (nur Transkript-Fakten)
 
-OUTPUT JSON Schema:
+═══════════════════════════════════════════════════════════════════
+OUTPUT JSON SCHEMA
+═══════════════════════════════════════════════════════════════════
+
 {
   "preferred_contact_time": string|null,
   "preferred_workload": string|null,
@@ -238,15 +314,29 @@ OUTPUT JSON Schema:
   "motivation": string|null,
   "expectations": string|null,
   "start": "YYYY-MM-DD"|null,
-  "experiences": [...],
-  "educations": [...]
+  "experiences": [
+    {
+      "start": "YYYY-MM-DD"|null,
+      "end": "YYYY-MM-DD"|null,
+      "company": string,
+      "tasks": string (MINIMUM 100 Zeichen, Stichpunkte mit "- ")
+    }
+  ],
+  "educations": [
+    {
+      "end": "YYYY-MM-DD"|null,
+      "company": string,
+      "description": string
+    }
+  ]
 }
 
-REGELN:
-- Nur Fakten aus dem Transkript extrahieren, keine Erfindungen
-- Bei Unsicherheit: null verwenden
-- Temporale Annotationen für genaue Daten nutzen
-- Motivation/Erwartungen als Stichpunkte mit "-" formatieren
+KRITISCHE REGELN:
+❌ KEINE Erfindungen - nur Transkript-Fakten
+❌ KEINE vagen tasks-Beschreibungen (<100 Zeichen)
+✅ Bei Unsicherheit: null verwenden
+✅ Temporale Annotationen [≈Jahr] nutzen
+✅ JEDE Experience detailliert beschreiben
 """
     
     def _build_transcript_context(

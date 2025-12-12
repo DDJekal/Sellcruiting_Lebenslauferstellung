@@ -138,16 +138,16 @@ class Experience(BaseModel):
     id: int
     start: Optional[str] = Field(default=None, description="Start date (YYYY-MM-DD)")
     end: Optional[str] = Field(default=None, description="End date (YYYY-MM-DD) or None if current")
-    company: str
-    tasks: str = Field(description="Description of tasks and responsibilities")
+    company: Optional[str] = Field(default=None, description="Company name or None if unknown")
+    tasks: str = Field(default="", description="Description of tasks and responsibilities")
 
 
 class Education(BaseModel):
     """Education/training entry."""
     id: int
     end: Optional[str] = Field(default=None, description="Completion date (YYYY-MM-DD)")
-    company: str = Field(description="Institution or organization")
-    description: str = Field(description="Degree, qualification, or course name")
+    company: Optional[str] = Field(default=None, description="Institution or organization")
+    description: str = Field(default="", description="Degree, qualification, or course name")
 
 
 class Resume(BaseModel):

@@ -100,35 +100,143 @@ AUFGABE:
 - Für JEDE Antwort: evidence[{span, turn_index, speaker}] angeben
 - Keine Halluzinationen: lieber null + notes
 
-REGELN FÜR yes_no-PROMPTS:
-- checked: true, value: "ja" → Kandidat stimmt zu:
-  1. EXPLIZIT: "ja", "passt", "würde gehen", "ist okay", "in ordnung", "genau", "richtig"
-  2. IMPLIZIT (nur bei Rahmenbedingungen/Angeboten): Recruiter erwähnt Angebot/Bedingung UND:
-     - Kandidat widerspricht NICHT
-     - Gespräch geht normal weiter (kein Abbruch, keine Bedenken)
-     - confidence: 0.8, notes: "Implizit akzeptiert (kein Widerspruch)"
-     - WICHTIG: Evidence muss die Erwähnung durch Recruiter enthalten
-- checked: false, value: "nein" → Kandidat lehnt ab:
-  - EXPLIZIT: "nein", "geht nicht", "kommt nicht in frage", "das passt mir nicht"
-  - IMPLIZIT: Kandidat äußert Bedenken, Zweifel, oder stellt Bedingungen
-- checked: null, value: null → Nicht im Gespräch erwähnt (confidence: 0.0, notes: "nicht erwähnt")
+═══════════════════════════════════════════════════════════════════
+REGELN FÜR yes_no-PROMPTS (VERSCHÄRFT)
+═══════════════════════════════════════════════════════════════════
 
-REGELN FÜR text_list-PROMPTS (z.B. Fortbildungen):
-- Durchsuche GESAMTES Transkript nach allen Nennungen
+✅ checked: true, value: "ja" → Kandidat stimmt EINDEUTIG zu:
+  
+  1. EXPLIZITE ZUSTIMMUNG (confidence: 0.95-1.0):
+     - "ja", "genau", "passt", "absolut", "auf jeden Fall"
+     - "würde gehen", "ist okay", "in Ordnung", "kein Problem"
+     - "das passt mir", "damit kann ich leben"
+  
+  2. IMPLIZITE ZUSTIMMUNG (confidence: 0.80-0.90):
+     Nur wenn ALLE Bedingungen erfüllt:
+     a) Recruiter erwähnt Rahmenbedingung/Angebot klar und deutlich
+     b) UND Kandidat reagiert POSITIV:
+        - Stellt Folgefrage zum Thema (zeigt Interesse)
+        - Sagt "gut", "schön", "prima" (auch wenn kurz)
+        - Antwortet mit relevantem Detail
+     c) UND Gespräch geht konstruktiv weiter (kein Abbruch)
+     
+     BEISPIEL AKZEPTIERT:
+     ┌─────────────────────────────────────────────────┐
+     │ Recruiter: "30 Tage Urlaub plus Sonderurlaub."  │
+     │ Kandidat: "Und wie sieht es mit Homeoffice aus?"│
+     │ → checked: true, confidence: 0.85               │
+     │ → notes: "Implizit - Folgefrage zeigt Akzeptanz"│
+     └─────────────────────────────────────────────────┘
+
+❌ checked: false, value: "nein" → Kandidat lehnt EINDEUTIG ab:
+  
+  1. EXPLIZITE ABLEHNUNG (confidence: 0.95-1.0):
+     - "nein", "geht nicht", "passt nicht", "kommt nicht in Frage"
+     - "das ist zu wenig", "das reicht mir nicht"
+     - "da kann ich nicht", "damit habe ich ein Problem"
+  
+  2. IMPLIZITE ABLEHNUNG (confidence: 0.80-0.90):
+     - Kandidat äußert Bedenken: "hmm, schwierig", "weiß nicht"
+     - Kandidat stellt Bedingungen: "nur wenn...", "müsste..."
+     - Kandidat weicht aus: "mal sehen", "muss überlegen"
+
+⚠️ checked: null, value: null → NICHT KLAR (confidence: 0.0):
+  
+  Diese Situationen sind KEINE Zustimmung:
+  1. Kandidat sagt GAR NICHTS zur Bedingung
+  2. Kandidat antwortet nur "hmm", "okay" (unspezifisch, kein Bezug)
+  3. Kandidat wechselt SOFORT das Thema (ignoriert Aussage)
+  4. Lange Pause (>3 Turns) zwischen Erwähnung und Reaktion
+  5. Recruiter erwähnt Bedingung, aber Gespräch wird unterbrochen
+  6. Telefonstörung während relevanter Passage
+  7. Ambivalente Antwort: "mal sehen", "vielleicht"
+  
+  BEISPIEL NICHT AKZEPTIERT:
+  ┌─────────────────────────────────────────────────┐
+  │ Recruiter: "30 Tage Urlaub plus Sonderurlaub."  │
+  │ Kandidat: "Hmm."                                 │
+  │ Recruiter: "Haben Sie noch andere Fragen?"      │
+  │ → checked: null, confidence: 0.0                │
+  │ → notes: "Keine klare Reaktion, Thema gewechselt"│
+  └─────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════
+REGELN FÜR text_list-PROMPTS (z.B. Fortbildungen)
+═══════════════════════════════════════════════════════════════════
+
+- Durchsuche GESAMTES Transkript nach ALLEN Nennungen
 - Erstelle vollständige Liste aller Items
 - Jedes Item mit separatem evidence-Eintrag
 - Format: ["Item1 (Jahr)", "Item2 (Jahr)", ...]
+- NICHT: Ein Item vergessen, weil es spät im Gespräch kam
 
-REGELN FÜR yes_no_with_details:
-- checked: wie bei yes_no
-- value: zusätzliche Details (z.B. "2 Jahre", "seit 2019")
+═══════════════════════════════════════════════════════════════════
+REGELN FÜR yes_no_with_details
+═══════════════════════════════════════════════════════════════════
 
-EVIDENZ-SNIPPETS:
-- Kurz halten (Keyword ± 30 Zeichen Kontext)
-- turn_index angeben (0-basiert)
-- speaker angeben ("A" = Kandidat, "B" = Recruiter)
+- checked: wie bei yes_no (siehe oben)
+- value: zusätzliche Details (z.B. "2 Jahre", "seit 2019", "40 Stunden/Woche")
+- Evidence muss BEIDE Aspekte abdecken (Zustimmung + Detail)
 
-OUTPUT-SCHEMA:
+═══════════════════════════════════════════════════════════════════
+EVIDENZ-SNIPPETS (QUALITÄTSANFORDERUNGEN)
+═══════════════════════════════════════════════════════════════════
+
+1. SPAN-LÄNGE:
+   - Minimum: Keyword + 20 Zeichen Kontext
+   - Maximum: 100 Zeichen
+   - Muss die Aussage VOLLSTÄNDIG enthalten
+
+2. PRÄZISION:
+   - Bei yes_no: Muss Zustimmung/Ablehnung klar zeigen
+   - Bei text_list: Jedes Item = separater Evidence-Eintrag
+   - Bei yes_no_with_details: Evidence muss Details enthalten
+
+3. TURN_INDEX:
+   - Immer angeben (0-basiert)
+   - Bei impliziter Zustimmung: BEIDE Turns angeben:
+     * Recruiter-Aussage (Turn X)
+     * Kandidat-Reaktion (Turn X+1 oder X+2)
+
+4. BEISPIEL GUTE EVIDENCE (implizite Zustimmung):
+{
+  "checked": true,
+  "value": "ja",
+  "confidence": 0.85,
+  "evidence": [
+    {
+      "span": "30 Tage Urlaub plus Sonderurlaub",
+      "turn_index": 45,
+      "speaker": "B"
+    },
+    {
+      "span": "Und wie sieht es mit Homeoffice aus",
+      "turn_index": 46,
+      "speaker": "A"
+    }
+  ],
+  "notes": "Implizit akzeptiert - Kandidat stellt interessierte Folgefrage"
+}
+
+5. BEISPIEL SCHLECHTE EVIDENCE (zu vage):
+{
+  "checked": true,
+  "value": "ja",
+  "confidence": 0.85,
+  "evidence": [
+    {
+      "span": "okay",  ❌ ZU KURZ
+      "turn_index": 46,
+      "speaker": "A"
+    }
+  ],
+  "notes": "Implizit"  ❌ ZU VAGE
+}
+
+═══════════════════════════════════════════════════════════════════
+OUTPUT-SCHEMA
+═══════════════════════════════════════════════════════════════════
+
 {
   "prompts": [
     {
@@ -137,12 +245,23 @@ OUTPUT-SCHEMA:
       "value": null|string|array,
       "confidence": <0.0-1.0>,
       "evidence": [
-        {"span": "...", "turn_index": <int>, "speaker": "A"|"B"}
+        {
+          "span": "...",
+          "turn_index": <int>,
+          "speaker": "A"|"B"
+        }
       ],
-      "notes": "..."
+      "notes": "Detaillierte Begründung für die Entscheidung"
     }
   ]
-}"""
+}
+
+KRITISCHE HINWEISE:
+❌ Im Zweifel: checked = null (lieber vorsichtig als False Positive)
+✅ Explizite Aussagen haben Vorrang vor impliziten
+✅ "Hmm", "okay" alleine ist KEINE Zustimmung
+✅ Notes müssen erklären, warum confidence < 0.95
+"""
     
     def _build_user_prompt(
         self,
@@ -187,23 +306,57 @@ TRANSKRIPT ({len(transcript)} Turns):
         # Add hint about implicit acceptance
         prompt_text += """
 
-WICHTIGER HINWEIS ZUR IMPLIZITEN ZUSTIMMUNG:
+═══════════════════════════════════════════════════════════════════
+WICHTIGE HINWEISE ZUR IMPLIZITEN ZUSTIMMUNG
+═══════════════════════════════════════════════════════════════════
+
 Bei Rahmenbedingungen (Gehalt, Vollzeit, Arbeitsvertrag, Urlaub, etc.):
-- Wenn der Recruiter das Angebot erwähnt (auch in längeren Absätzen!) UND der Kandidat das Gespräch normal fortsetzt
-- OHNE Bedenken zu äußern oder Bedingungen zu stellen
-- DANN gilt das als implizite Zustimmung (checked: true, confidence: 0.8)
-- Evidence muss die relevante Recruiter-Aussage enthalten (auch aus langen Texten!)
 
-WICHTIG: Durchsuche lange Recruiter-Monologe sorgfältig nach Angeboten/Rahmenbedingungen!
+✅ AKZEPTIERT als implizite Zustimmung (confidence: 0.80-0.90):
+   Wenn ALLE Kriterien erfüllt:
+   1. Recruiter erwähnt das Angebot/Bedingung explizit (auch in langen Absätzen!)
+   2. Kandidat reagiert POSITIV (Folgefrage, "gut", "schön", relevantes Detail)
+   3. Gespräch geht konstruktiv weiter
+   
+   Evidence muss BEIDE Turns enthalten (Recruiter + Kandidat)
 
-Beispiele:
-1. Recruiter: "Unbefristeter Arbeitsvertrag wäre das dann."
-   Kandidat: [sagt nichts dagegen, Gespräch geht weiter]
-   → checked: true, value: "ja", confidence: 0.8, notes: "Implizit akzeptiert"
+❌ NICHT akzeptiert (checked: null):
+   1. Kandidat sagt gar nichts zur Bedingung
+   2. Nur "hmm" oder "okay" ohne Bezug zum Thema
+   3. Kandidat wechselt sofort das Thema
+   4. Lange Pause (>3 Turns) zwischen Erwähnung und Reaktion
+   5. Ambivalente Antworten: "mal sehen", "vielleicht", "muss ich überlegen"
 
-2. Recruiter: "...attraktives Grundgehalt plus leistungsabhängige Erfolgsbeteiligung..."
-   Kandidat: [keine Ablehnung, Gespräch geht weiter]
-   → checked: true, value: "ja", confidence: 0.8, notes: "Implizit akzeptiert"
+BEISPIEL 1 - ✅ IMPLIZITE ZUSTIMMUNG:
+┌───────────────────────────────────────────────────────────────┐
+│ [Turn 45] B: "Unbefristeter Vertrag mit 30 Tagen Urlaub."     │
+│ [Turn 46] A: "Das klingt gut. Gibt es Homeoffice?"            │
+│                                                                │
+│ → checked: true, value: "ja", confidence: 0.85                │
+│ → evidence: [                                                  │
+│     {span: "Unbefristeter Vertrag mit 30 Tagen Urlaub",       │
+│      turn_index: 45, speaker: "B"},                           │
+│     {span: "Das klingt gut. Gibt es Homeoffice",              │
+│      turn_index: 46, speaker: "A"}                            │
+│   ]                                                            │
+│ → notes: "Implizit akzeptiert - positive Reaktion + Folgefrage"│
+└───────────────────────────────────────────────────────────────┘
+
+BEISPIEL 2 - ❌ KEINE ZUSTIMMUNG:
+┌───────────────────────────────────────────────────────────────┐
+│ [Turn 45] B: "Unbefristeter Vertrag mit 30 Tagen Urlaub."     │
+│ [Turn 46] A: "Hmm."                                            │
+│ [Turn 47] B: "Haben Sie noch Fragen zur Position?"            │
+│                                                                │
+│ → checked: null, value: null, confidence: 0.0                 │
+│ → evidence: []                                                 │
+│ → notes: "Keine klare Reaktion - Recruiter wechselt Thema"    │
+└───────────────────────────────────────────────────────────────┘
+
+WICHTIG: 
+- Durchsuche lange Recruiter-Monologe sorgfältig nach Angeboten!
+- Im Zweifel: checked = null (lieber vorsichtig)
+- "Hmm"/"okay" alleine ist KEINE Zustimmung
 
 FÜLLE NUN DAS PROTOKOLL (als JSON):"""
         
