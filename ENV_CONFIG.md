@@ -1,78 +1,41 @@
-# Environment Configuration für ElevenLabs Integration & Temporal Enrichment
+# Environment Variables für KI-Sellcruiting Pipeline
 
-## Erforderliche API-Keys
+## Benötigte Environment Variables in Render:
 
 ```bash
-# OpenAI API (erforderlich für LLM-Extraction)
-OPENAI_API_KEY=sk-...
+# OpenAI API Configuration
+OPENAI_API_KEY=your_openai_api_key_here
 OPENAI_MODEL=gpt-4o-2024-08-06
 
-# Anthropic API (optional, nur für MCP-Temporal-Validation)
-ANTHROPIC_API_KEY=sk-ant-...
-```
+# Questionnaire API Configuration
+HIRINGS_API_URL=https://your-api-domain.com
+WEBHOOK_API_KEY=your_webhook_api_key_here
 
-## Temporal Enrichment Konfiguration
+# Optional: Anthropic für temporale Validierung
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
 
-### USE_MCP_TEMPORAL_VALIDATION
-**Typ:** Boolean (true/false)  
-**Standard:** false  
-**Beschreibung:** Aktiviert MCP (Claude) für die Validierung und Verbesserung von temporalen Annotationen in ambigen Fällen.
+# Optional: HOC API
+HOC_API_URL=
+HOC_API_KEY=
 
-```bash
-# Nur dateparser nutzen (schnell, kostenlos)
+# Server Configuration
+PORT=10000
+
+# Optional: Protocol Template Fallback
+DEFAULT_PROTOCOL_TEMPLATE_ID=63
+
+# Optional: Temporal Validation
 USE_MCP_TEMPORAL_VALIDATION=false
-
-# MCP-Validation aktivieren (für bessere Genauigkeit bei komplexen Zeitangaben)
-USE_MCP_TEMPORAL_VALIDATION=true
 ```
 
-**Wann MCP nutzen:**
-- Bei ambigen Ausdrücken wie "damals", "zu der Zeit", "währenddessen"
-- Bei komplexen Timelines mit mehreren verschachtelten Zeitreferenzen
-- Wenn höchste Präzision bei Zeitangaben kritisch ist
+## Wichtig:
 
-**Kosten-Nutzen:**
-- Ohne MCP: ~85% Genauigkeit, €0 Kosten, ~10s Verarbeitung
-- Mit MCP: ~92% Genauigkeit, ~€0.05 pro Transkript (100 Turns), ~40s Verarbeitung
+1. **HIRINGS_API_URL**: Basis-URL Ihrer API (z.B. `https://api.example.com`)
+2. **WEBHOOK_API_KEY**: API-Key für Authentifizierung bei der Questionnaire-API
+3. Die API muss den Endpoint `GET /api/v1/questionnaire/<campaign_id>` bereitstellen
 
-### MCP_CONFIDENCE_THRESHOLD
-**Typ:** Float (0.0-1.0)  
-**Standard:** 0.8  
-**Beschreibung:** Schwellenwert für Confidence-Score. Nur Ausdrücke mit niedrigerem Score werden an MCP eskaliert.
+## Neue Features:
 
-```bash
-MCP_CONFIDENCE_THRESHOLD=0.8  # Standard
-MCP_CONFIDENCE_THRESHOLD=0.9  # Weniger MCP-Calls, höhere Kosten-Effizienz
-MCP_CONFIDENCE_THRESHOLD=0.7  # Mehr MCP-Calls, höhere Genauigkeit
-```
-
-## ElevenLabs Integration
-
-Die Integration erkennt automatisch ElevenLabs `post_call_transcription` Webhooks anhand des `type` Feldes.
-
-**Unterstützte Formate:**
-1. **ElevenLabs Webhook** (automatisch erkannt)
-   - `type: "post_call_transcription"`
-   - Extrahiert: Kandidateninfo, Zeitstempel, Call-Metadaten
-   
-2. **Internes Format** (backward-kompatibel)
-   - Array von `{speaker: "A"|"B", text: "..."}`
-
-## Empfohlene Konfiguration
-
-### Entwicklung/Testing
-```bash
-USE_MCP_TEMPORAL_VALIDATION=false  # Schnell, kostenlos
-```
-
-### Produktion (Standard)
-```bash
-USE_MCP_TEMPORAL_VALIDATION=false  # dateparser ist für die meisten Fälle ausreichend
-```
-
-### Produktion (High-Precision)
-```bash
-USE_MCP_TEMPORAL_VALIDATION=true   # Für kritische Anwendungen
-MCP_CONFIDENCE_THRESHOLD=0.8       # Ausgewogener Kompromiss
-```
-
+- Automatischer Abruf des Gesprächsprotokolls via `campaign_id` aus ElevenLabs Metadata
+- Fallback zu lokalem Template wenn API nicht verfügbar
+- Vollständige ElevenLabs Metadata-Extraktion (campaign_id, applicant_id, to_number, etc.)

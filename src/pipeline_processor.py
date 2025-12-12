@@ -1,6 +1,7 @@
 """Pipeline processor wrapper for webhook integration."""
 import os
 import json
+import logging
 from pathlib import Path
 from typing import Dict, Any
 from datetime import datetime
@@ -14,7 +15,10 @@ from extractor import Extractor
 from mapper import Mapper
 from validator import Validator
 from resume_builder import ResumeBuilder
+from questionnaire_client import QuestionnaireClient
 from models import MandantenConfig
+
+logger = logging.getLogger(__name__)
 
 
 def process_elevenlabs_call(webhook_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -34,6 +38,9 @@ def process_elevenlabs_call(webhook_data: Dict[str, Any]) -> Dict[str, Any]:
     
     conversation_id = metadata.get('conversation_id')
     call_timestamp = metadata.get('start_time_unix_secs')
+    campaign_id = metadata.get('campaign_id')
+    
+    logger.info(f"Processing call: conversation_id={conversation_id}, campaign_id={campaign_id}")
     
     # Temporal enrichment
     use_mcp = os.getenv('USE_MCP_TEMPORAL_VALIDATION', 'false').lower() == 'true'
@@ -41,20 +48,39 @@ def process_elevenlabs_call(webhook_data: Dict[str, Any]) -> Dict[str, Any]:
     transcript = temporal_enricher.enrich_transcript(transcript, use_mcp=use_mcp)
     temporal_context = temporal_enricher.extract_temporal_context(transcript)
     
-    # Load or generate protocol template
-    # For now, we'll use a default template ID
-    # TODO: Make this configurable via webhook metadata
-    protocol_template_id = int(os.getenv('DEFAULT_PROTOCOL_TEMPLATE_ID', '63'))
+    # Load protocol template
+    # Priority: 1. API (if campaign_id available), 2. Local fallback
+    protocol = None
+    protocol_source = "unknown"
     
-    protocol_path = Path(f"Input2/Gesprächsprotokollbeispiel_2.json")
-    if not protocol_path.exists():
-        raise FileNotFoundError(f"Protocol template not found: {protocol_path}")
+    if campaign_id:
+        # Try to fetch questionnaire from API
+        try:
+            questionnaire_client = QuestionnaireClient()
+            protocol = questionnaire_client.get_questionnaire_sync(campaign_id)
+            protocol_source = f"api_campaign_{campaign_id}"
+            logger.info(f"Loaded protocol from API for campaign_id={campaign_id}")
+        except Exception as e:
+            logger.warning(f"Failed to fetch questionnaire from API for campaign {campaign_id}: {e}")
+            logger.info("Falling back to local protocol template")
     
-    with open(protocol_path, 'r', encoding='utf-8') as f:
-        protocol = json.load(f)
+    # Fallback to local protocol if API failed or no campaign_id
+    if not protocol:
+        protocol_template_id = int(os.getenv('DEFAULT_PROTOCOL_TEMPLATE_ID', '63'))
+        protocol_path = Path(f"Input2/Gesprächsprotokollbeispiel_2.json")
+        
+        if not protocol_path.exists():
+            raise FileNotFoundError(f"Protocol template not found: {protocol_path}")
+        
+        with open(protocol_path, 'r', encoding='utf-8') as f:
+            protocol = json.load(f)
+        
+        protocol_source = f"local_template_{protocol_template_id}"
+        logger.info(f"Loaded local protocol template: {protocol_template_id}")
     
     # Load or generate config
-    config_path = Path(f"config/mandanten/template_{protocol_template_id}.yaml")
+    protocol_id = protocol.get("id", 63)
+    config_path = Path(f"config/mandanten/template_{protocol_id}.yaml")
     if not config_path.exists():
         config_generator = ConfigGenerator()
         config_data = config_generator.generate_config(protocol, output_path=config_path)
@@ -118,6 +144,8 @@ def process_elevenlabs_call(webhook_data: Dict[str, Any]) -> Dict[str, Any]:
     protocol_output = filled_protocol.model_dump()
     protocol_output['elevenlabs_metadata'] = metadata
     protocol_output['temporal_context'] = temporal_context
+    protocol_output['protocol_source'] = protocol_source
+    protocol_output['campaign_id'] = campaign_id
     
     protocol_filename = f"filled_protocol_{conversation_id}.json"
     with open(output_dir / protocol_filename, 'w', encoding='utf-8') as f:
@@ -131,6 +159,8 @@ def process_elevenlabs_call(webhook_data: Dict[str, Any]) -> Dict[str, Any]:
     # Return result
     return {
         "conversation_id": conversation_id,
+        "campaign_id": campaign_id,
+        "protocol_source": protocol_source,
         "applicant_id": applicant_resume.applicant.id,
         "resume_id": applicant_resume.resume.id,
         "applicant": applicant_resume.applicant.model_dump(),

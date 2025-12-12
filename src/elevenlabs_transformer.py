@@ -96,12 +96,17 @@ class ElevenLabsTransformer:
             "call_summary": analysis.get("transcript_summary"),
             "call_summary_title": analysis.get("call_summary_title"),
             # Dynamic variables (candidate info)
-            "candidate_first_name": dynamic_vars.get("candidatefirst_name"),
-            "candidate_last_name": dynamic_vars.get("candidatelast_name"),
-            "company_name": dynamic_vars.get("companyname"),
+            "candidate_first_name": dynamic_vars.get("candidate_first_name") or dynamic_vars.get("candidatefirst_name"),
+            "candidate_last_name": dynamic_vars.get("candidate_last_name") or dynamic_vars.get("candidatelast_name"),
+            "company_name": dynamic_vars.get("company_name") or dynamic_vars.get("companyname"),
             "campaign_role_title": dynamic_vars.get("campaignrole_title"),
             "campaign_location": dynamic_vars.get("campaignlocation_label"),
             "company_priorities": dynamic_vars.get("companypriorities"),
             "company_pitch": dynamic_vars.get("companypitch"),
+            # Call initiation data (from client)
+            "campaign_id": dynamic_vars.get("campaign_id"),
+            "applicant_id": dynamic_vars.get("applicant_id"),
+            "to_number": dynamic_vars.get("to_number"),
+            "agent_phone_number_id": dynamic_vars.get("agent_phone_number_id"),
         }
 
