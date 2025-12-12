@@ -146,21 +146,67 @@ def process_elevenlabs_call(webhook_data: Dict[str, Any]) -> Dict[str, Any]:
     output_dir = Path("Output")
     output_dir.mkdir(exist_ok=True)
     
-    # Save protocol
-    protocol_output = filled_protocol.model_dump()
-    protocol_output['elevenlabs_metadata'] = metadata
-    protocol_output['temporal_context'] = temporal_context
-    protocol_output['protocol_source'] = protocol_source
-    protocol_output['campaign_id'] = campaign_id
+    # 1. Save minimal protocol (only checked values, no metadata)
+    protocol_minimal = {
+        "id": filled_protocol.protocol_id,
+        "name": filled_protocol.protocol_name,
+        "campaign_id": campaign_id,
+        "conversation_id": conversation_id,
+        "pages": []
+    }
     
-    protocol_filename = f"filled_protocol_{conversation_id}.json"
+    for page in filled_protocol.pages:
+        minimal_prompts = []
+        for prompt in page.prompts:
+            minimal_prompt = {
+                "id": prompt.id,
+                "question": prompt.question,
+                "position": len(minimal_prompts) + 1,
+                "checked": prompt.answer.checked if prompt.answer else None
+            }
+            minimal_prompts.append(minimal_prompt)
+        
+        minimal_page = {
+            "id": page.id,
+            "name": page.name,
+            "position": len(protocol_minimal["pages"]) + 1,
+            "prompts": minimal_prompts
+        }
+        protocol_minimal["pages"].append(minimal_page)
+    
+    protocol_filename = f"protocol_{conversation_id}.json"
     with open(output_dir / protocol_filename, 'w', encoding='utf-8') as f:
-        json.dump(protocol_output, f, indent=2, ensure_ascii=False)
+        json.dump(protocol_minimal, f, indent=2, ensure_ascii=False)
     
-    # Save resume
+    # 2. Save resume (unchanged)
     resume_filename = f"resume_{applicant_resume.applicant.id}.json"
     with open(output_dir / resume_filename, 'w', encoding='utf-8') as f:
         json.dump(applicant_resume.model_dump(), f, indent=2, ensure_ascii=False)
+    
+    # 3. Save metadata (NEW: all metadata in separate file)
+    metadata_filename = f"metadata_{conversation_id}.json"
+    metadata_output = {
+        "conversation_id": conversation_id,
+        "campaign_id": campaign_id,
+        "applicant_id": applicant_resume.applicant.id,
+        "protocol_source": protocol_source,
+        "elevenlabs": metadata,
+        "temporal_context": temporal_context,
+        "processing": {
+            "timestamp": datetime.utcnow().isoformat(),
+            "experiences_count": len(applicant_resume.resume.experiences),
+            "educations_count": len(applicant_resume.resume.educations),
+            "protocol_pages_count": len(filled_protocol.pages),
+            "protocol_prompts_count": sum(len(p.prompts) for p in filled_protocol.pages)
+        },
+        "files": {
+            "protocol": protocol_filename,
+            "resume": resume_filename,
+            "metadata": metadata_filename
+        }
+    }
+    with open(output_dir / metadata_filename, 'w', encoding='utf-8') as f:
+        json.dump(metadata_output, f, indent=2, ensure_ascii=False)
     
     # Return result
     return {
@@ -171,9 +217,15 @@ def process_elevenlabs_call(webhook_data: Dict[str, Any]) -> Dict[str, Any]:
         "resume_id": applicant_resume.resume.id,
         "applicant": applicant_resume.applicant.model_dump(),
         "resume": applicant_resume.resume.model_dump(),
-        "protocol": protocol_output,
+        "protocol": protocol_minimal,  # Return minimal protocol
+        "metadata": metadata_output,    # Return metadata separately
         "experiences_count": len(applicant_resume.resume.experiences),
         "educations_count": len(applicant_resume.resume.educations),
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.utcnow().isoformat(),
+        "files": {
+            "protocol": protocol_filename,
+            "resume": resume_filename,
+            "metadata": metadata_filename
+        }
     }
 
