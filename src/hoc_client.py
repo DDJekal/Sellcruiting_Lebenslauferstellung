@@ -12,13 +12,14 @@ class HOCClient:
     """Client for HOC API integration."""
     
     def __init__(self):
-        self.api_url = os.getenv("HOC_API_URL")
-        self.api_key = os.getenv("HOC_API_KEY")
+        # Use HIRINGS_API_URL and HIRING_API_TOKEN (same API for both questionnaire and data submission)
+        self.api_url = os.getenv("HIRINGS_API_URL")
+        self.api_key = os.getenv("HIRING_API_TOKEN")
         
         if not self.api_url:
-            logger.warning("HOC_API_URL not configured")
+            logger.warning("HIRINGS_API_URL not configured")
         if not self.api_key:
-            logger.warning("HOC_API_KEY not configured")
+            logger.warning("HIRING_API_TOKEN not configured")
     
     async def send_applicant(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -31,7 +32,7 @@ class HOCClient:
             Combined response from all three HOC API endpoints
         """
         if not self.api_url or not self.api_key:
-            raise ValueError("HOC API not configured (missing URL or API_KEY)")
+            raise ValueError("HOC API not configured (missing HIRINGS_API_URL or HIRING_API_TOKEN)")
         
         campaign_id = data.get("campaign_id")
         if not campaign_id:

@@ -7,17 +7,12 @@
 OPENAI_API_KEY=your_openai_api_key_here
 OPENAI_MODEL=gpt-4o-2024-08-06
 
-# Questionnaire API Configuration
-HIRINGS_API_URL=https://your-api-domain.com
+# Questionnaire API Configuration (auch für HOC API verwendet)
+HIRINGS_API_URL=https://high-office.hirings.cloud/api/v1
 HIRING_API_TOKEN=your_hiring_api_token_here
 
 # Optional: Anthropic für temporale Validierung
 ANTHROPIC_API_KEY=your_anthropic_api_key_here
-
-# HOC API Configuration (3 separate endpoints)
-# Verwendet dieselbe URL und denselben Token wie HIRINGS_API
-HOC_API_URL=https://high-office.hirings.cloud/api/v1
-HOC_API_KEY=your_hiring_api_token_here  # Derselbe Token wie HIRING_API_TOKEN
 
 # Server Configuration
 PORT=10000
@@ -31,9 +26,10 @@ USE_MCP_TEMPORAL_VALIDATION=false
 
 ## Wichtig:
 
-1. **HIRINGS_API_URL**: Basis-URL Ihrer API (z.B. `https://high-office.hirings.cloud/api/v1`)
-2. **HIRING_API_TOKEN**: API-Token für Authentifizierung bei der Questionnaire-API
-3. Die API muss den Endpoint `GET /api/v1/questionnaire/<campaign_id>` bereitstellen
+1. **HIRINGS_API_URL**: Basis-URL der API (z.B. `https://high-office.hirings.cloud/api/v1`)
+   - Wird verwendet für: Questionnaire API (GET /questionnaire/{campaign_id}) UND HOC API (POST zu 3 Endpunkten)
+2. **HIRING_API_TOKEN**: API-Token für Authentifizierung
+   - Wird verwendet für: Questionnaire API UND HOC API (beide verwenden denselben Token)
 
 ## HOC API Integration:
 
@@ -47,9 +43,9 @@ Die HOC API verwendet **3 separate Endpunkte** zum Senden der Daten:
 headers = {"Authorization": token}  # NICHT: f"Bearer {token}"
 ```
 
-**Empfohlene Konfiguration in Render**:
-- `HOC_API_URL` = `https://high-office.hirings.cloud/api/v1` (gleiche Base-URL wie HIRINGS_API_URL)
-- `HOC_API_KEY` = Derselbe Token wie `HIRING_API_TOKEN`
+**Benötigte Environment Variables in Render**:
+- `HIRINGS_API_URL` = `https://high-office.hirings.cloud/api/v1`
+- `HIRING_API_TOKEN` = Ihr JWT Token (wird für beide APIs verwendet)
 
 ## Neue Features:
 
