@@ -14,9 +14,10 @@ HIRING_API_TOKEN=your_hiring_api_token_here
 # Optional: Anthropic für temporale Validierung
 ANTHROPIC_API_KEY=your_anthropic_api_key_here
 
-# Optional: HOC API
-HOC_API_URL=
-HOC_API_KEY=
+# HOC API Configuration (3 separate endpoints)
+# Verwendet dieselbe URL und denselben Token wie HIRINGS_API
+HOC_API_URL=https://high-office.hirings.cloud/api/v1
+HOC_API_KEY=your_hiring_api_token_here  # Derselbe Token wie HIRING_API_TOKEN
 
 # Server Configuration
 PORT=10000
@@ -33,6 +34,22 @@ USE_MCP_TEMPORAL_VALIDATION=false
 1. **HIRINGS_API_URL**: Basis-URL Ihrer API (z.B. `https://high-office.hirings.cloud/api/v1`)
 2. **HIRING_API_TOKEN**: API-Token für Authentifizierung bei der Questionnaire-API
 3. Die API muss den Endpoint `GET /api/v1/questionnaire/<campaign_id>` bereitstellen
+
+## HOC API Integration:
+
+Die HOC API verwendet **3 separate Endpunkte** zum Senden der Daten:
+1. **POST /api/v1/campaigns/{campaign_id}/transcript/** - Gesprächsprotokoll (minimal, nur checked-Werte)
+2. **POST /api/v1/applicants/resume** - Bewerber + Lebenslauf (vollständig)
+3. **POST /api/v1/applicants/ai/call/meta** - ElevenLabs Metadata + Temporal Context
+
+**Authorization**: Direkter Token ohne "Bearer" Präfix:
+```python
+headers = {"Authorization": token}  # NICHT: f"Bearer {token}"
+```
+
+**Empfohlene Konfiguration in Render**:
+- `HOC_API_URL` = `https://high-office.hirings.cloud/api/v1` (gleiche Base-URL wie HIRINGS_API_URL)
+- `HOC_API_KEY` = Derselbe Token wie `HIRING_API_TOKEN`
 
 ## Neue Features:
 
