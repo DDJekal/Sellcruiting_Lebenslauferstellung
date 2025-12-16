@@ -47,7 +47,7 @@ async def health_check():
         "checks": {
             "openai_api_key": bool(os.getenv("OPENAI_API_KEY")),
             "anthropic_api_key": bool(os.getenv("ANTHROPIC_API_KEY")),
-            "hoc_api_configured": bool(os.getenv("HOC_API_URL")),
+            "hoc_api_configured": bool(os.getenv("HIRINGS_API_URL") and os.getenv("HIRING_API_TOKEN")),
         },
         "timestamp": datetime.utcnow().isoformat()
     }
@@ -142,14 +142,14 @@ async def process_webhook(webhook_data: Dict[str, Any], conversation_id: str):
         logger.info(f"  - Educations: {result['educations_count']}")
         
         # Send to HOC (if configured)
-        if os.getenv("HOC_API_URL"):
+        if os.getenv("HIRINGS_API_URL") and os.getenv("HIRING_API_TOKEN"):
             try:
                 hoc_response = await send_to_hoc(result)
                 logger.info(f"HOC API response: {hoc_response}")
             except Exception as hoc_error:
                 logger.error(f"HOC API error: {hoc_error}", exc_info=True)
         else:
-            logger.warning("HOC_API_URL not configured, skipping HOC submission")
+            logger.warning("HIRINGS_API_URL or HIRING_API_TOKEN not configured, skipping HOC submission")
         
         logger.info(f"Processing completed for conversation: {conversation_id}")
         
