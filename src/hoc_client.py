@@ -113,20 +113,25 @@ class HOCClient:
         """
         Prepare payload for POST /api/v1/campaigns/{campaign_id}/transcript/
         
+        Die HOC API erwartet die 'pages' direkt auf Top-Level, nicht innerhalb von 'protocol'!
+        
         Format:
         {
           "conversation_id": "conv_...",
           "applicant_id": 89778,
-          "protocol": {...},
+          "pages": [...],  # Direkt hier, nicht in protocol!
           "timestamp": "2025-12-14T10:23:45Z"
         }
         """
         protocol = data.get("protocol_minimal", data.get("protocol", {}))
         
+        # Extract pages from protocol (HOC API expects them directly on top level)
+        pages = protocol.get("pages", [])
+        
         return {
             "conversation_id": data.get("conversation_id"),
             "applicant_id": data.get("applicant_id"),
-            "protocol": protocol,
+            "pages": pages,  # ← Pages direkt, nicht innerhalb von protocol!
             "timestamp": data.get("metadata", {}).get("processing", {}).get("timestamp")
         }
     
