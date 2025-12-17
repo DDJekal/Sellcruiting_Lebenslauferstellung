@@ -83,6 +83,8 @@ class ResumeBuilder:
         if metadata:
             first_name = metadata.get('candidate_first_name')
             last_name = metadata.get('candidate_last_name')
+            # Extract phone from ElevenLabs to_number (the phone number that was called)
+            phone = metadata.get('to_number')
         
         # Extract missing fields from transcript
         full_text = ' '.join(turn.get('text', '') for turn in transcript)
@@ -370,6 +372,42 @@ KRITISCHE REGELN:
 - Erwähnte Jahre im Transkript: {temporal_context.get('mentioned_years', [])}
 
 """
+        
+        context += "TRANSKRIPT:\n"
+        for i, turn in enumerate(transcript):
+            speaker_label = "Kandidat" if turn['speaker'] == 'A' else "Recruiter"
+            context += f"[{i}] {speaker_label}: {turn['text']}\n"
+        
+        context += "\n\nExtrahiere nun die strukturierten Lebenslaufdaten als JSON:"
+        
+        return context
+
+
+
+        
+        context += "TRANSKRIPT:\n"
+        for i, turn in enumerate(transcript):
+            speaker_label = "Kandidat" if turn['speaker'] == 'A' else "Recruiter"
+            context += f"[{i}] {speaker_label}: {turn['text']}\n"
+        
+        context += "\n\nExtrahiere nun die strukturierten Lebenslaufdaten als JSON:"
+        
+        return context
+
+
+
+        
+        context += "TRANSKRIPT:\n"
+        for i, turn in enumerate(transcript):
+            speaker_label = "Kandidat" if turn['speaker'] == 'A' else "Recruiter"
+            context += f"[{i}] {speaker_label}: {turn['text']}\n"
+        
+        context += "\n\nExtrahiere nun die strukturierten Lebenslaufdaten als JSON:"
+        
+        return context
+
+
+
         
         context += "TRANSKRIPT:\n"
         for i, turn in enumerate(transcript):
