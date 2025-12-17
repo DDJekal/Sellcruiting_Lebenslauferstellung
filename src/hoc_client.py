@@ -113,26 +113,24 @@ class HOCClient:
         """
         Prepare payload for POST /api/v1/campaigns/{campaign_id}/transcript/
         
-        Die HOC API erwartet die 'pages' direkt auf Top-Level, nicht innerhalb von 'protocol'!
-        
-        Format:
+        HOC API Format:
         {
+          "id": 255,
+          "name": "Projektleiter",
+          "campaign_id": "255",
           "conversation_id": "conv_...",
-          "applicant_id": 89778,
-          "pages": [...],  # Direkt hier, nicht in protocol!
-          "timestamp": "2025-12-14T10:23:45Z"
+          "pages": [...]
         }
         """
         protocol = data.get("protocol_minimal", data.get("protocol", {}))
-        
-        # Extract pages from protocol (HOC API expects them directly on top level)
-        pages = protocol.get("pages", [])
+        campaign_id = data.get("campaign_id")
         
         return {
+            "id": int(campaign_id) if campaign_id else None,
+            "name": protocol.get("name", ""),
+            "campaign_id": str(campaign_id) if campaign_id else "",
             "conversation_id": data.get("conversation_id"),
-            "applicant_id": data.get("applicant_id"),
-            "pages": pages,  # ← Pages direkt, nicht innerhalb von protocol!
-            "timestamp": data.get("metadata", {}).get("processing", {}).get("timestamp")
+            "pages": protocol.get("pages", [])
         }
     
     def _prepare_resume_payload(self, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -222,11 +220,13 @@ class HOCClient:
         # Enrich temporal context
         temporal_enriched = self._enrich_temporal_context(temporal_context, elevenlabs)
         
+        campaign_id = data.get("campaign_id")
+        
         return {
             "conversation_id": data.get("conversation_id"),
-            "campaign_id": data.get("campaign_id"),
+            "campaign_id": str(campaign_id) if campaign_id else "",
             "applicant_id": data.get("applicant_id"),
-            "protocol_source": data.get("protocol_source", f"api_campaign_{data.get('campaign_id')}"),
+            "protocol_source": data.get("protocol_source", f"api_campaign_{campaign_id}"),
             "elevenlabs": elevenlabs_enriched,
             "temporal_context": temporal_enriched,
             "processing": processing,
