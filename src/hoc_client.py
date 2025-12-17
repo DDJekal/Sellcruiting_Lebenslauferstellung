@@ -38,6 +38,9 @@ class HOCClient:
         if not campaign_id:
             raise ValueError("campaign_id is required for HOC API")
         
+        logger.info(f"🚀 Starting HOC API submission for campaign_id={campaign_id}, applicant_id={data.get('applicant_id')}")
+        logger.info(f"📊 Data keys available: {list(data.keys())}")
+        
         results = {}
         
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -49,6 +52,7 @@ class HOCClient:
             # 1. Send Resume to /api/v1/applicants/resume (ZUERST - erstellt/findet Applicant!)
             try:
                 resume_payload = self._prepare_resume_payload(data)
+                logger.info(f"📤 Sending Resume payload: {resume_payload}")
                 response_resume = await client.post(
                     f"{self.api_url}/applicants/resume",
                     json=resume_payload,
@@ -59,7 +63,7 @@ class HOCClient:
                 logger.info(f"✅ Resume sent to HOC: Applicant {data.get('applicant_id')}")
                 
             except httpx.HTTPStatusError as e:
-                logger.error(f"❌ Resume API error: {e.response.status_code} - {e.response.text}")
+                logger.error(f"❌ Resume API error: {e.response.status_code} - {e.response.text[:500]}")
                 results["resume"] = {"error": str(e), "status_code": e.response.status_code}
             except Exception as e:
                 logger.error(f"❌ Error sending resume: {e}")
@@ -68,6 +72,7 @@ class HOCClient:
             # 2. Send Transcript/Protocol to /api/v1/campaigns/{campaign_id}/transcript/ (ZWEITENS)
             try:
                 transcript_payload = self._prepare_transcript_payload(data)
+                logger.info(f"📤 Sending Transcript payload keys: {list(transcript_payload.keys())}, pages_count: {len(transcript_payload.get('pages', []))}")
                 response_transcript = await client.post(
                     f"{self.api_url}/campaigns/{campaign_id}/transcript/",
                     json=transcript_payload,
@@ -78,7 +83,7 @@ class HOCClient:
                 logger.info(f"✅ Transcript sent to HOC: Campaign {campaign_id}")
                 
             except httpx.HTTPStatusError as e:
-                logger.error(f"❌ Transcript API error: {e.response.status_code} - {e.response.text}")
+                logger.error(f"❌ Transcript API error: {e.response.status_code} - {e.response.text[:500]}")
                 results["transcript"] = {"error": str(e), "status_code": e.response.status_code}
             except Exception as e:
                 logger.error(f"❌ Error sending transcript: {e}")
@@ -87,6 +92,7 @@ class HOCClient:
             # 3. Send Metadata to /api/v1/applicants/ai/call/meta (DRITTENS)
             try:
                 meta_payload = self._prepare_meta_payload(data)
+                logger.info(f"📤 Sending Metadata with applicant_id: {meta_payload.get('applicant_id')}, campaign_id: {meta_payload.get('campaign_id')}")
                 response_meta = await client.post(
                     f"{self.api_url}/applicants/ai/call/meta",
                     json=meta_payload,
@@ -97,7 +103,7 @@ class HOCClient:
                 logger.info(f"✅ Metadata sent to HOC: Conversation {data.get('conversation_id')}")
                 
             except httpx.HTTPStatusError as e:
-                logger.error(f"❌ Metadata API error: {e.response.status_code} - {e.response.text}")
+                logger.error(f"❌ Metadata API error: {e.response.status_code} - {e.response.text[:500]}")
                 results["metadata"] = {"error": str(e), "status_code": e.response.status_code}
             except Exception as e:
                 logger.error(f"❌ Error sending metadata: {e}")
