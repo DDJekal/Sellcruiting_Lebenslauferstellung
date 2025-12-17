@@ -46,26 +46,7 @@ class HOCClient:
                 "Content-Type": "application/json"
             }
             
-            # 1. Send Transcript/Protocol to /api/v1/campaigns/{campaign_id}/transcript/
-            try:
-                transcript_payload = self._prepare_transcript_payload(data)
-                response_transcript = await client.post(
-                    f"{self.api_url}/campaigns/{campaign_id}/transcript/",
-                    json=transcript_payload,
-                    headers=headers
-                )
-                response_transcript.raise_for_status()
-                results["transcript"] = response_transcript.json()
-                logger.info(f"✅ Transcript sent to HOC: Campaign {campaign_id}")
-                
-            except httpx.HTTPStatusError as e:
-                logger.error(f"❌ Transcript API error: {e.response.status_code} - {e.response.text}")
-                results["transcript"] = {"error": str(e), "status_code": e.response.status_code}
-            except Exception as e:
-                logger.error(f"❌ Error sending transcript: {e}")
-                results["transcript"] = {"error": str(e)}
-            
-            # 2. Send Resume to /api/v1/applicants/resume
+            # 1. Send Resume to /api/v1/applicants/resume (ZUERST - erstellt/findet Applicant!)
             try:
                 resume_payload = self._prepare_resume_payload(data)
                 response_resume = await client.post(
@@ -84,7 +65,26 @@ class HOCClient:
                 logger.error(f"❌ Error sending resume: {e}")
                 results["resume"] = {"error": str(e)}
             
-            # 3. Send Metadata to /api/v1/applicants/ai/call/meta
+            # 2. Send Transcript/Protocol to /api/v1/campaigns/{campaign_id}/transcript/ (ZWEITENS)
+            try:
+                transcript_payload = self._prepare_transcript_payload(data)
+                response_transcript = await client.post(
+                    f"{self.api_url}/campaigns/{campaign_id}/transcript/",
+                    json=transcript_payload,
+                    headers=headers
+                )
+                response_transcript.raise_for_status()
+                results["transcript"] = response_transcript.json()
+                logger.info(f"✅ Transcript sent to HOC: Campaign {campaign_id}")
+                
+            except httpx.HTTPStatusError as e:
+                logger.error(f"❌ Transcript API error: {e.response.status_code} - {e.response.text}")
+                results["transcript"] = {"error": str(e), "status_code": e.response.status_code}
+            except Exception as e:
+                logger.error(f"❌ Error sending transcript: {e}")
+                results["transcript"] = {"error": str(e)}
+            
+            # 3. Send Metadata to /api/v1/applicants/ai/call/meta (DRITTENS)
             try:
                 meta_payload = self._prepare_meta_payload(data)
                 response_meta = await client.post(
@@ -141,8 +141,8 @@ class HOCClient:
         
         Format:
         {
+          "campaign_id": "255",
           "applicant": {
-            "id": 89778,
             "first_name": "David",
             "last_name": "Jekal",
             "email": "...",
@@ -150,28 +150,41 @@ class HOCClient:
             "postal_code": "..."
           },
           "resume": {
-            "id": 90778,
-            "applicant_id": 89778,  # <-- WICHTIG: applicant_id muss hier rein!
-            "experiences": [...],
-            "educations": [...],
+            "preferred_contact_time": "...",
+            "preferred_workload": "...",
+            "willing_to_relocate": "...",
+            "earliest_start": "...",
+            "current_job": "...",
             "motivation": "...",
-            "expectations": "..."
+            "expectations": "...",
+            "start": "...",
+            "experiences": [...],
+            "educations": [...]
           }
         }
         """
-        applicant = data.get("applicant", {})
-        resume = data.get("resume", {})
-        applicant_id = data.get("applicant_id")
+        applicant = data.get("applicant", {}).copy()
+        resume = data.get("resume", {}).copy()
+        campaign_id = data.get("campaign_id")
         
-        # WICHTIG: applicant.id MUSS gesetzt sein für HOC API!
-        if applicant_id and "id" not in applicant:
-            applicant["id"] = applicant_id
+        # WICHTIG: applicant.id NICHT senden - HOC API erstellt/findet Applicant!
+        applicant.pop("id", None)
         
-        # WICHTIG: resume.applicant_id MUSS gesetzt sein für HOC API!
-        if applicant_id and "applicant_id" not in resume:
-            resume["applicant_id"] = applicant_id
+        # WICHTIG: resume.id und applicant_id NICHT senden - HOC API setzt automatisch!
+        resume.pop("id", None)
+        resume.pop("applicant_id", None)
+        
+        # WICHTIG: Keine IDs in experiences/educations - HOC API erstellt neue Einträge!
+        if "experiences" in resume:
+            for exp in resume["experiences"]:
+                exp.pop("id", None)
+        
+        if "educations" in resume:
+            for edu in resume["educations"]:
+                edu.pop("id", None)
         
         return {
+            "campaign_id": str(campaign_id) if campaign_id else "",
             "applicant": applicant,
             "resume": resume
         }
