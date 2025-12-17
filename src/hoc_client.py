@@ -119,6 +119,7 @@ class HOCClient:
           "name": "Projektleiter",
           "campaign_id": "255",
           "conversation_id": "conv_...",
+          "applicant_id": 89778,
           "pages": [...]
         }
         """
@@ -130,6 +131,7 @@ class HOCClient:
             "name": protocol.get("name", ""),
             "campaign_id": str(campaign_id) if campaign_id else "",
             "conversation_id": data.get("conversation_id"),
+            "applicant_id": data.get("applicant_id"),
             "pages": protocol.get("pages", [])
         }
     
@@ -161,7 +163,11 @@ class HOCClient:
         resume = data.get("resume", {})
         applicant_id = data.get("applicant_id")
         
-        # Add applicant_id to resume if not already present
+        # WICHTIG: applicant.id MUSS gesetzt sein für HOC API!
+        if applicant_id and "id" not in applicant:
+            applicant["id"] = applicant_id
+        
+        # WICHTIG: resume.applicant_id MUSS gesetzt sein für HOC API!
         if applicant_id and "applicant_id" not in resume:
             resume["applicant_id"] = applicant_id
         
