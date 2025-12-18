@@ -53,21 +53,48 @@ def process_elevenlabs_call(webhook_data: Dict[str, Any]) -> Dict[str, Any]:
     # Priority: 1. API (if campaign_id available), 2. Local fallback
     protocol = None
     protocol_source = "unknown"
+    original_protocol_metadata = {}  # Store original metadata from HOC
     
     if campaign_id:
-        # Try to fetch questionnaire from API
+        # Try to fetch transcript (Gesprächsprotokoll) from HOC API
         try:
             questionnaire_client = QuestionnaireClient()
-            api_questionnaire = questionnaire_client.get_questionnaire_sync(campaign_id)
+            api_transcript = questionnaire_client.get_questionnaire_sync(campaign_id)
+            
+            # Store original metadata (created_on, updated_on, etc.)
+            original_protocol_metadata = {
+                "id": api_transcript.get("id"),
+                "name": api_transcript.get("name"),
+                "created_on": api_transcript.get("created_on"),
+                "updated_on": api_transcript.get("updated_on")
+            }
+            
+            # Store page/prompt metadata
+            for page in api_transcript.get("pages", []):
+                page_meta = {
+                    "created_on": page.get("created_on"),
+                    "updated_on": page.get("updated_on")
+                }
+                original_protocol_metadata[f"page_{page['id']}"] = page_meta
+                
+                for prompt in page.get("prompts", []):
+                    prompt_meta = {
+                        "information": prompt.get("information"),
+                        "is_template": prompt.get("is_template"),
+                        "created_on": prompt.get("created_on"),
+                        "updated_on": prompt.get("updated_on"),
+                        "type": prompt.get("type")  # Original type from HOC
+                    }
+                    original_protocol_metadata[f"prompt_{prompt['id']}"] = prompt_meta
             
             # Transform API format to internal format
             transformer = QuestionnaireTransformer()
-            protocol = transformer.transform(api_questionnaire, campaign_id=campaign_id)
+            protocol = transformer.transform(api_transcript, campaign_id=campaign_id)
             
             protocol_source = f"api_campaign_{campaign_id}"
-            logger.info(f"Loaded and transformed protocol from API for campaign_id={campaign_id}")
+            logger.info(f"Loaded and transformed transcript from HOC API for campaign_id={campaign_id}")
         except Exception as e:
-            logger.warning(f"Failed to fetch questionnaire from API for campaign {campaign_id}: {e}")
+            logger.warning(f"Failed to fetch transcript from API for campaign {campaign_id}: {e}")
             logger.info("Falling back to local protocol template")
     
     # Fallback to local protocol if API failed or no campaign_id
@@ -146,26 +173,34 @@ def process_elevenlabs_call(webhook_data: Dict[str, Any]) -> Dict[str, Any]:
     output_dir = Path("Output")
     output_dir.mkdir(exist_ok=True)
     
-    # 1. Save minimal protocol (only checked values, no metadata)
+    # 1. Save minimal protocol (preserving HOC metadata)
     protocol_minimal = {
         "id": filled_protocol.protocol_id,
         "name": filled_protocol.protocol_name,
+        "created_on": original_protocol_metadata.get("created_on"),
+        "updated_on": original_protocol_metadata.get("updated_on"),
         "campaign_id": campaign_id,
         "conversation_id": conversation_id,
         "pages": []
     }
     
     for page in filled_protocol.pages:
+        page_meta = original_protocol_metadata.get(f"page_{page.id}", {})
         minimal_prompts = []
+        
         for prompt in page.prompts:
+            prompt_meta = original_protocol_metadata.get(f"prompt_{prompt.id}", {})
+            
             minimal_prompt = {
                 "id": prompt.id,
                 "question": prompt.question,
+                "information": prompt_meta.get("information"),
                 "position": len(minimal_prompts) + 1,
-                "type": prompt.inferred_type.value if prompt.inferred_type else None,
                 "checked": prompt.answer.checked if prompt.answer else None,
-                "answer": prompt.answer.value if (prompt.answer and prompt.answer.value) else None,
-                "information": None  # Not available in our processing pipeline
+                "is_template": prompt_meta.get("is_template", False),
+                "created_on": prompt_meta.get("created_on"),
+                "updated_on": prompt_meta.get("updated_on"),
+                "type": prompt_meta.get("type", prompt.inferred_type.value if prompt.inferred_type else None)
             }
             minimal_prompts.append(minimal_prompt)
         
@@ -173,6 +208,8 @@ def process_elevenlabs_call(webhook_data: Dict[str, Any]) -> Dict[str, Any]:
             "id": page.id,
             "name": page.name,
             "position": len(protocol_minimal["pages"]) + 1,
+            "created_on": page_meta.get("created_on"),
+            "updated_on": page_meta.get("updated_on"),
             "prompts": minimal_prompts
         }
         protocol_minimal["pages"].append(minimal_page)

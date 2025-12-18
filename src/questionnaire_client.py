@@ -1,4 +1,4 @@
-"""Client for fetching questionnaire/protocol from API."""
+"""Client for fetching transcript/protocol from HOC API."""
 import os
 import logging
 from typing import Dict, Any, Optional
@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 class QuestionnaireClient:
-    """Client to fetch questionnaire (protocol) from API by campaign_id."""
+    """Client to fetch transcript (Gesprächsprotokoll) from HOC API by campaign_id."""
     
     def __init__(self, api_base_url: Optional[str] = None, api_key: Optional[str] = None):
         """
@@ -28,44 +28,47 @@ class QuestionnaireClient:
     
     async def get_questionnaire(self, campaign_id: str) -> Dict[str, Any]:
         """
-        Fetch questionnaire/protocol by campaign_id.
+        Fetch transcript (Gesprächsprotokoll) by campaign_id.
+        
+        This fetches the EXISTING transcript with all metadata (created_on, updated_on, etc.),
+        not just the questionnaire template.
         
         Args:
             campaign_id: Campaign ID (e.g., "255")
             
         Returns:
-            Protocol/Questionnaire JSON structure
+            Transcript/Protocol JSON structure with metadata
             
         Raises:
             httpx.HTTPError: If request fails
         """
-        url = f"{self.api_base_url}/questionnaire/{campaign_id}"
+        url = f"{self.api_base_url}/campaigns/{campaign_id}/transcript/"
         
         headers = {
             "Authorization": self.api_key,  # Direct token, no Bearer prefix
             "Content-Type": "application/json"
         }
         
-        logger.info(f"Fetching questionnaire for campaign_id={campaign_id} from {url}")
+        logger.info(f"Fetching transcript for campaign_id={campaign_id} from {url}")
         
         async with httpx.AsyncClient(timeout=30.0) as client:
             try:
                 response = await client.get(url, headers=headers)
                 response.raise_for_status()
                 
-                questionnaire = response.json()
-                logger.info(f"Successfully fetched questionnaire for campaign {campaign_id}")
+                transcript = response.json()
+                logger.info(f"Successfully fetched transcript for campaign {campaign_id}")
                 
-                return questionnaire
+                return transcript
                 
             except httpx.HTTPStatusError as e:
-                logger.error(f"HTTP error fetching questionnaire: {e.response.status_code} - {e.response.text}")
+                logger.error(f"HTTP error fetching transcript: {e.response.status_code} - {e.response.text}")
                 raise
             except httpx.RequestError as e:
-                logger.error(f"Request error fetching questionnaire: {e}")
+                logger.error(f"Request error fetching transcript: {e}")
                 raise
             except Exception as e:
-                logger.error(f"Unexpected error fetching questionnaire: {e}")
+                logger.error(f"Unexpected error fetching transcript: {e}")
                 raise
     
     def get_questionnaire_sync(self, campaign_id: str) -> Dict[str, Any]:
@@ -76,34 +79,34 @@ class QuestionnaireClient:
             campaign_id: Campaign ID (e.g., "255")
             
         Returns:
-            Protocol/Questionnaire JSON structure
+            Transcript/Protocol JSON structure with metadata
         """
-        url = f"{self.api_base_url}/questionnaire/{campaign_id}"
+        url = f"{self.api_base_url}/campaigns/{campaign_id}/transcript/"
         
         headers = {
             "Authorization": self.api_key,  # Direct token, no Bearer prefix
             "Content-Type": "application/json"
         }
         
-        logger.info(f"Fetching questionnaire for campaign_id={campaign_id} from {url}")
+        logger.info(f"Fetching transcript for campaign_id={campaign_id} from {url}")
         
         with httpx.Client(timeout=30.0) as client:
             try:
                 response = client.get(url, headers=headers)
                 response.raise_for_status()
                 
-                questionnaire = response.json()
-                logger.info(f"Successfully fetched questionnaire for campaign {campaign_id}")
+                transcript = response.json()
+                logger.info(f"Successfully fetched transcript for campaign {campaign_id}")
                 
-                return questionnaire
+                return transcript
                 
             except httpx.HTTPStatusError as e:
-                logger.error(f"HTTP error fetching questionnaire: {e.response.status_code} - {e.response.text}")
+                logger.error(f"HTTP error fetching transcript: {e.response.status_code} - {e.response.text}")
                 raise
             except httpx.RequestError as e:
-                logger.error(f"Request error fetching questionnaire: {e}")
+                logger.error(f"Request error fetching transcript: {e}")
                 raise
             except Exception as e:
-                logger.error(f"Unexpected error fetching questionnaire: {e}")
+                logger.error(f"Unexpected error fetching transcript: {e}")
                 raise
 
