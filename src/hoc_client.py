@@ -74,7 +74,17 @@ class HOCClient:
             # 2. Send Transcript/Protocol to /api/v1/campaigns/{campaign_id}/transcript/ (ZWEITENS)
             try:
                 transcript_payload = self._prepare_transcript_payload(data)
+                
+                # Log detailed protocol structure
+                total_prompts = sum(len(page.get("prompts", [])) for page in transcript_payload.get("pages", []))
+                answered_prompts = sum(
+                    1 for page in transcript_payload.get("pages", [])
+                    for prompt in page.get("prompts", [])
+                    if prompt.get("checked") is not None or prompt.get("answer") is not None
+                )
+                logger.info(f"📤 [TRANSCRIPT] Sending protocol: {len(transcript_payload.get('pages', []))} pages, {total_prompts} prompts ({answered_prompts} answered)")
                 logger.info(f"📤 [TRANSCRIPT] Full payload: {json.dumps(transcript_payload, ensure_ascii=False, default=str)}")
+                
                 response_transcript = await client.post(
                     f"{self.api_url}/campaigns/{campaign_id}/transcript/",
                     json=transcript_payload,

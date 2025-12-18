@@ -162,7 +162,10 @@ def process_elevenlabs_call(webhook_data: Dict[str, Any]) -> Dict[str, Any]:
                 "id": prompt.id,
                 "question": prompt.question,
                 "position": len(minimal_prompts) + 1,
-                "checked": prompt.answer.checked if prompt.answer else None
+                "type": prompt.inferred_type.value if prompt.inferred_type else None,
+                "checked": prompt.answer.checked if prompt.answer else None,
+                "answer": prompt.answer.value if (prompt.answer and prompt.answer.value) else None,
+                "information": None  # Not available in our processing pipeline
             }
             minimal_prompts.append(minimal_prompt)
         
