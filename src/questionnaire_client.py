@@ -96,13 +96,6 @@ class QuestionnaireClient:
                 response.raise_for_status()
                 
                 transcript = response.json()
-                
-                # #region agent log
-                import json as json_lib
-                with open(r'c:\Users\David Jekal\Desktop\Projekte\KI-Sellcruiting_VerarbeitungProtokollErgebnisse\.cursor\debug.log', 'a', encoding='utf-8') as f:
-                    f.write(json_lib.dumps({"location":"questionnaire_client.py:95","message":"API response received","data":{"campaign_id":campaign_id,"response_keys":list(transcript.keys()),"has_pages":("pages" in transcript),"pages_count":len(transcript.get("pages",[])) if isinstance(transcript.get("pages"),list) else 0,"response_preview":str(transcript)[:500]},"timestamp":__import__('time').time()*1000,"sessionId":"debug-session","hypothesisId":"A,B,D"}) + '\n')
-                # #endregion
-                
                 logger.info(f"Successfully fetched transcript for campaign {campaign_id}")
                 
                 return transcript

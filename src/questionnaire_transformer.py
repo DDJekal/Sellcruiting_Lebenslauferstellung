@@ -45,20 +45,15 @@ class QuestionnaireTransformer:
           ]
         }
         """
-        # #region agent log
-        import json as json_lib
-        with open(r'c:\Users\David Jekal\Desktop\Projekte\KI-Sellcruiting_VerarbeitungProtokollErgebnisse\.cursor\debug.log', 'a', encoding='utf-8') as f:
-            f.write(json_lib.dumps({"location":"questionnaire_transformer.py:48","message":"Transform input","data":{"has_questions":("questions" in api_questionnaire),"has_pages":("pages" in api_questionnaire),"top_keys":list(api_questionnaire.keys())[:10],"campaign_id":campaign_id},"timestamp":__import__('time').time()*1000,"sessionId":"debug-session","hypothesisId":"C,D"}) + '\n')
-        # #endregion
+        # Check if API response already has pages format (transcript format)
+        if "pages" in api_questionnaire and api_questionnaire.get("pages"):
+            # Already in internal format - return as is (transcript from /campaigns/{id}/transcript/)
+            return api_questionnaire
         
+        # Otherwise transform from questions format (questionnaire from /questionnaire/{id})
         questions = api_questionnaire.get("questions", [])
         
         if not questions:
-            # #region agent log
-            import json as json_lib
-            with open(r'c:\Users\David Jekal\Desktop\Projekte\KI-Sellcruiting_VerarbeitungProtokollErgebnisse\.cursor\debug.log', 'a', encoding='utf-8') as f:
-                f.write(json_lib.dumps({"location":"questionnaire_transformer.py:58","message":"No questions found - raising error","data":{"api_keys":list(api_questionnaire.keys()),"pages_present":("pages" in api_questionnaire),"questions_val":questions},"timestamp":__import__('time').time()*1000,"sessionId":"debug-session","hypothesisId":"E"}) + '\n')
-            # #endregion
             raise ValueError("No questions found in API response")
         
         # Group questions by category (becomes pages)
