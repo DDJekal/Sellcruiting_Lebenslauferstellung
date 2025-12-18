@@ -384,38 +384,8 @@ KRITISCHE REGELN:
 
 
 
-        
-        context += "TRANSKRIPT:\n"
-        for i, turn in enumerate(transcript):
-            speaker_label = "Kandidat" if turn['speaker'] == 'A' else "Recruiter"
-            context += f"[{i}] {speaker_label}: {turn['text']}\n"
-        
-        context += "\n\nExtrahiere nun die strukturierten Lebenslaufdaten als JSON:"
-        
-        return context
 
 
 
-        
-        context += "TRANSKRIPT:\n"
-        for i, turn in enumerate(transcript):
-            speaker_label = "Kandidat" if turn['speaker'] == 'A' else "Recruiter"
-            context += f"[{i}] {speaker_label}: {turn['text']}\n"
-        
-        context += "\n\nExtrahiere nun die strukturierten Lebenslaufdaten als JSON:"
-        
-        return context
-
-
-
-        
-        context += "TRANSKRIPT:\n"
-        for i, turn in enumerate(transcript):
-            speaker_label = "Kandidat" if turn['speaker'] == 'A' else "Recruiter"
-            context += f"[{i}] {speaker_label}: {turn['text']}\n"
-        
-        context += "\n\nExtrahiere nun die strukturierten Lebenslaufdaten als JSON:"
-        
-        return context
 
 
