@@ -201,10 +201,16 @@ class HOCClient:
         if "experiences" in resume:
             for exp in resume["experiences"]:
                 exp.pop("id", None)
+                # Ensure company is never null (HOC may reject null values)
+                if exp.get("company") is None:
+                    exp["company"] = ""
         
         if "educations" in resume:
             for edu in resume["educations"]:
                 edu.pop("id", None)
+                # Ensure company is never null
+                if edu.get("company") is None:
+                    edu["company"] = ""
         
         return {
             "campaign_id": str(campaign_id) if campaign_id else "",
