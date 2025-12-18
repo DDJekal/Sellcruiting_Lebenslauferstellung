@@ -1,5 +1,6 @@
 """Type enricher for inferring prompt types (Shadow-Types)."""
 import re
+import json
 import hashlib
 from typing import Dict, List, Any
 import os
@@ -307,7 +308,6 @@ Antworte nur mit JSON im angegebenen Format."""
             )
             
             # Parse response
-            import json
             classifications = json.loads(response.choices[0].message.content)
             
             # Handle both array and object responses
