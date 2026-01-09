@@ -149,9 +149,11 @@ class ResumeBuilder:
             for i, exp in enumerate(result.get('experiences', []), start=1):
                 experiences.append(Experience(
                     id=i,
+                    position=exp.get('position'),
                     start=exp.get('start'),
                     end=exp.get('end'),
                     company=exp.get('company') or None,  # Explicitly allow None
+                    employment_type=exp.get('employment_type'),
                     tasks=exp.get('tasks', '')
                 ))
             
@@ -237,20 +239,24 @@ EXPERIENCES - QUALITÄTS-ANFORDERUNGEN
    - Verantwortungsbereiche (z.B. "Team von 5 Personen")
    - Errungenschaften (z.B. "Umsatzsteigerung um 20%")
    - Branchen/Bereiche (z.B. "im Bereich E-Commerce")
+   - SCHWERPUNKTE erkennbar machen (z.B. "Schwerpunkt: Hardwarekonstruktion")
    
-   FORMAT: Stichpunkte mit "- "
+   ⚠️ FORMAT: Fließtext mit Semikolon-Trennung (KEIN "- " am Anfang!)
    MINDESTLÄNGE: 100 Zeichen pro Experience (STRENG!)
    
    ⚠️ KRITISCHE REGEL: 
    - Jede Experience MUSS mindestens 100 Zeichen im tasks-Feld haben
    - Wenn nur wenig Info im Transkript: Erweitere mit typischen Aufgaben für die Position
-   - z.B. "Pflegefachkraft" → "- Patientenbetreuung und -pflege\n- Medikamentenvergabe\n- Vitalwerte-Überwachung\n- Dokumentation"
+   - Format: Fließtext, einzelne Tätigkeiten mit Semikolon getrennt
    
-   ✅ GUT - Detailliert (187 Zeichen):
-   "- Entwicklung von Python-basierten Automatisierungsskripten für Datenverarbeitung\n- Projektkoordination zwischen IT-Abteilung und Fachabteilungen\n- Betreuung und Mentoring von 3 Junior-Entwicklern\n- Implementierung agiler Methoden (Scrum, Kanban) im Team"
+   ✅ GUT - Detailliert mit Schwerpunkt (210 Zeichen):
+   "Hardwarekonstruktion für Kundenanlagen (Schwerpunkt: Automatisierungstechnik); Integration von Kundenwünschen in Anlagendesigns; Kundenaustausch und technische Beratung; Prozessoptimierung zur Automatisierung von Betriebsabläufen; Sonderaufgaben im Bereich Digitalisierung"
    
-   ✅ GUT - Auch bei wenig Info erweitert (124 Zeichen):
-   "- Patientenbetreuung in der Inneren Medizin\n- Medikamentenvergabe und Wundversorgung\n- Überwachung von Vitalparametern\n- Pflegedokumentation"
+   ✅ GUT - Auch bei wenig Info erweitert (187 Zeichen):
+   "Entwicklung von Python-basierten Automatisierungsskripten für Datenverarbeitung; Projektkoordination zwischen IT-Abteilung und Fachabteilungen; Betreuung und Mentoring von 3 Junior-Entwicklern; Implementierung agiler Methoden (Scrum, Kanban) im Team"
+   
+   ❌ SCHLECHT - Mit Aufzählungszeichen (veraltet):
+   "- Patientenbetreuung in der Inneren Medizin\n- Medikamentenvergabe und Wundversorgung"
    
    ❌ SCHLECHT - Zu vage (31 Zeichen):
    "Arbeit in der Inneren Medizin"
@@ -258,47 +264,121 @@ EXPERIENCES - QUALITÄTS-ANFORDERUNGEN
    ❌ INAKZEPTABEL - Unter 100 Zeichen:
    "Entwicklung und Projektarbeit" (28 Zeichen)
 
-3. COMPANY-FELD:
-   ✅ Vollständigen Firmennamen extrahieren (z.B. "Siemens AG")
-   ❌ Bei unklarem Namen: null (nicht raten!)
+3. POSITION-FELD (KRITISCH - PFLICHTFELD):
+   ✅ Extrahiere die GENAUE Berufsbezeichnung:
+   - "Konstrukteur" (nicht "Arbeit in der Konstruktion")
+   - "Werkstudent Hardwarekonstruktion"
+   - "Projektleiter Elektrotechnik"
+   - "Pflegefachkraft"
+   - "Software-Entwickler"
+   
+   ❌ Keine vagen Beschreibungen wie:
+   - "Arbeit in der Konstruktion"
+   - "tätig in..."
+   - "im Bereich..."
 
-4. BEISPIEL VOLLSTÄNDIGE EXPERIENCE:
+4. COMPANY-FELD - VOLLSTÄNDIGER FIRMENNAME:
+   ✅ Immer den VOLLSTÄNDIGEN Firmennamen extrahieren:
+   - "Windmüller und Hölscher GmbH, Lengrich"
+   - "Siemens AG"
+   - "Klinikum der Stadt Köln"
+   
+   ❌ NICHT AKZEPTABEL:
+   - "eine Firma"
+   - "ein Unternehmen"
+   - "Firma XY"
+   
+   ⚠️ Bei unklarem Namen: null (nicht raten!)
+
+5. EMPLOYMENT_TYPE-FELD (NEU - WICHTIG):
+   Unterscheide klar zwischen verschiedenen Beschäftigungsarten:
+   - "Hauptjob" (Vollzeit-Hauptbeschäftigung)
+   - "Nebenjob" (geringfügige Beschäftigung parallel zu Hauptjob)
+   - "Werkstudent" (während Studium, meist 15-20h/Woche)
+   - "Duales Studium" (Kombination Arbeit + Studium, oft 3 Tage/Woche)
+   - "Praktikum" (befristete Lernphase)
+   - "Ausbildung" (Berufsausbildung)
+   
+   HINWEIS: 
+   - Sortiere Experiences nach Start-Datum (neueste zuerst)
+   - Markiere aber Haupt- vs. Nebenjobs im employment_type Feld
+   - So ist erkennbar, was parallel lief
+
+6. BEISPIEL VOLLSTÄNDIGE EXPERIENCE:
 {
-  "start": "2021-01-01",
+  "position": "Werkstudent Hardwarekonstruktion",
+  "start": "2021-08-01",
   "end": null,
-  "company": "Siemens AG",
-  "tasks": "- Entwicklung von Python-basierten Automatisierungsskripten für Datenanalyse und Reporting\n- Projektkoordination zwischen IT-Abteilung und Fachabteilungen im Bereich Industrie 4.0\n- Betreuung und Mentoring von 3 Junior-Entwicklern im agilen Team\n- Implementierung von Scrum und Kanban für effizientere Arbeitsabläufe\n- Durchführung von Code-Reviews und Qualitätssicherung"
+  "company": "Windmüller und Hölscher GmbH, Lengrich",
+  "employment_type": "Duales Studium",
+  "tasks": "Hardwarekonstruktion für Kundenanlagen (Schwerpunkt: Automatisierungstechnik); Integration von Kundenwünschen in bestehende Anlagendesigns; Kundenaustausch und technische Beratung; Prozessoptimierung zur Automatisierung von Betriebsabläufen; Sonderaufgaben im Bereich Digitalisierung"
 }
 
 ═══════════════════════════════════════════════════════════════════
-EDUCATIONS - VOLLSTÄNDIGKEIT
+EDUCATIONS - VOLLSTÄNDIGKEIT (KRITISCH)
 ═══════════════════════════════════════════════════════════════════
 
-1. ALLE AUSBILDUNGEN ERFASSEN:
-   - Studium (Bachelor, Master, Diplom)
-   - Berufsausbildung
-   - Weiterbildungen/Zertifikate
-   - Kurse (wenn relevant)
+1. ALLE AUSBILDUNGEN ERFASSEN (PFLICHT):
+   ✅ Schulbildung (WICHTIG - oft vergessen!):
+   - Abitur (mit Schule und Jahr)
+   - Realschulabschluss
+   - Fachabitur
+   
+   ✅ Berufsausbildung:
+   - Ausbildung zum/zur...
+   - IHK-Abschlüsse
+   
+   ✅ Hochschulbildung:
+   - Bachelor/Master/Diplom
+   - Hochschule/Universität MIT VOLLSTÄNDIGEM NAMEN
+   
+   ✅ Weiterbildungen/Zertifikate
+   ✅ Kurse (wenn relevant)
+   
+   ⚠️ KRITISCHE REGEL:
+   - Durchsuche GESAMTES Transkript nach ALLEN Bildungsstationen
+   - Auch beiläufige Erwähnungen: "hab Abi gemacht", "war auf dem Gymnasium"
+   - Schule NICHT vergessen! Oft im ersten Drittel des Gesprächs erwähnt
 
-2. DESCRIPTION-FELD:
-   ✅ "Bachelor of Science Informatik"
-   ✅ "Ausbildung zum Fachinformatiker Systemintegration"
-   ✅ "Zertifizierung: AWS Solutions Architect"
-   ❌ "Studium" (zu vage)
+2. DESCRIPTION-FELD - PRÄZISE:
+   ✅ GUT:
+   - "Abitur (Note: 2,3)" (wenn Note erwähnt)
+   - "Bachelor of Science Elektrotechnik"
+   - "Ausbildung zum Fachinformatiker Systemintegration"
+   - "Zertifizierung: AWS Solutions Architect"
+   
+   ❌ SCHLECHT:
+   - "Studium" (zu vage - welcher Abschluss?)
+   - "Schule" (zu vage - welcher Abschluss?)
 
-3. COMPANY-FELD:
-   - Vollständiger Institutionsname
-   - z.B. "TU München", "IHK Berlin", "Coursera"
+3. COMPANY-FELD - VOLLSTÄNDIGER INSTITUTIONSNAME (PFLICHT):
+   ✅ GUT:
+   - "Hochschule Osnabrück am Westerberg"
+   - "Gymnasium Musterhausen"
+   - "TU München"
+   - "IHK Köln"
+   
+   ❌ NICHT AKZEPTABEL:
+   - "Hochschule" (ohne Name)
+   - "Uni" (ohne Name)
+   - null (wenn Institution im Transkript genannt wurde!)
 
 ═══════════════════════════════════════════════════════════════════
 WEITERE FELDER
 ═══════════════════════════════════════════════════════════════════
 
-- preferred_contact_time: z.B. "Abends (18:00-21:00)", "Werktags ab 17 Uhr"
-- preferred_workload: "Vollzeit (40h)", "Teilzeit (30h)", "Flexible Arbeitszeit"
+- preferred_contact_time: z.B. "Nachmittags (15:00-17:00)", "Werktags ab 17 Uhr", "Abends"
+- preferred_workload: 
+  ⚠️ WICHTIG: Bei Teilzeit IMMER Stundenzahl angeben!
+  Beispiele:
+  - "Vollzeit (40h/Woche)"
+  - "Teilzeit (20h/Woche)"
+  - "Teilzeit (25 Stunden pro Woche)"
+  - "3 Tage die Woche" → umrechnen zu "Teilzeit (ca. 24h/Woche)"
+  - "Flexible Arbeitszeit"
 - willing_to_relocate: "ja", "nein", oder null (wenn nicht erwähnt)
 - earliest_start: Frühester Starttermin (ISO-Date oder null)
-- current_job: z.B. "Software-Entwickler bei Siemens AG" (Position + Firma)
+- current_job: z.B. "Konstrukteur bei Windmüller und Hölscher" (Position + Firma)
 - motivation: Stichpunkte mit "- " (z.B. "- Mehr Verantwortung\n- Bessere Work-Life-Balance")
 - expectations: Stichpunkte mit "- " (z.B. "- Homeoffice-Möglichkeit\n- Weiterbildungsbudget")
 - start: Gewünschtes Startdatum (ISO-Date oder null)
@@ -310,13 +390,19 @@ QUALITÄTSPRÜFUNG (SELBST-VALIDIERUNG)
 Vor dem Senden überprüfen:
 1. ✅ Alle Daten temporal gültig? (start < end)
 2. ✅ JEDE Experience mit mind. 100 Zeichen in tasks? (KRITISCH!)
-3. ✅ Alle erwähnten Jobs erfasst?
-4. ✅ Wenn "current_job" → muss Experience mit end=null existieren
-5. ✅ Keine Halluzinationen? (nur Transkript-Fakten)
+3. ✅ JEDE Experience hat position-Feld ausgefüllt? (KRITISCH!)
+4. ✅ JEDE Experience hat vollständigen Firmennamen in company? (KRITISCH!)
+5. ✅ Alle erwähnten Jobs erfasst?
+6. ✅ Alle erwähnten Bildungsstationen erfasst (inkl. Schule!)? (KRITISCH!)
+7. ✅ Wenn "current_job" → muss Experience mit end=null existieren
+8. ✅ Keine Halluzinationen? (nur Transkript-Fakten)
+9. ✅ Bei Teilzeit: Stundenzahl angegeben? (KRITISCH!)
 
-⚠️ WARNUNG: Experiences mit tasks < 100 Zeichen werden ABGELEHNT!
-   → Erweitere mit typischen Aufgaben für die Position
-   → Nutze Branchenkontext (z.B. "Pflegefachkraft" → Pflege-Aufgaben)
+⚠️ WARNUNG: 
+- Experiences mit tasks < 100 Zeichen werden ABGELEHNT!
+- Tasks mit "- " am Anfang werden ABGELEHNT (nutze Semikolon-Format)!
+- Experiences ohne position werden ABGELEHNT!
+- Vage Firmennamen ("eine Firma") werden ABGELEHNT!
 
 ═══════════════════════════════════════════════════════════════════
 OUTPUT JSON SCHEMA
@@ -324,7 +410,7 @@ OUTPUT JSON SCHEMA
 
 {
   "preferred_contact_time": string|null,
-  "preferred_workload": string|null,
+  "preferred_workload": string|null (z.B. "Vollzeit (40h/Woche)" oder "Teilzeit (25h/Woche)" - bei Teilzeit IMMER mit Stundenzahl!),
   "willing_to_relocate": "ja"|"nein"|null,
   "earliest_start": "YYYY-MM-DD"|null,
   "current_job": string|null,
@@ -333,27 +419,36 @@ OUTPUT JSON SCHEMA
   "start": "YYYY-MM-DD"|null,
   "experiences": [
     {
+      "position": string (PFLICHT - Berufsbezeichnung, z.B. "Konstrukteur", "Werkstudent Hardwarekonstruktion"),
       "start": "YYYY-MM-DD"|null,
       "end": "YYYY-MM-DD"|null,
-      "company": string,
-      "tasks": string (MINIMUM 100 Zeichen, Stichpunkte mit "- ")
+      "company": string (PFLICHT - vollständiger Firmenname, z.B. "Windmüller und Hölscher GmbH, Lengrich"),
+      "employment_type": string (z.B. "Hauptjob", "Nebenjob", "Werkstudent", "Duales Studium", "Praktikum"),
+      "tasks": string (Fließtext mit Semikolon-Trennung, KEIN "- " am Anfang!, MINIMUM 100 Zeichen, Schwerpunkt erkennbar!)
     }
   ],
   "educations": [
     {
       "end": "YYYY-MM-DD"|null,
-      "company": string,
-      "description": string
+      "company": string (PFLICHT - vollständiger Institutionsname, z.B. "Hochschule Osnabrück", "Gymnasium Musterhausen"),
+      "description": string (präzise Bezeichnung, z.B. "Bachelor Elektrotechnik", "Abitur", "Realschulabschluss")
     }
   ]
 }
 
 KRITISCHE REGELN:
 ❌ KEINE Erfindungen - nur Transkript-Fakten
+❌ KEINE "- " am Anfang von tasks (nutze Semikolon-Format)
 ❌ KEINE vagen tasks-Beschreibungen (<100 Zeichen)
-✅ Bei Unsicherheit: null verwenden
+❌ KEINE vagen Firmennamen ("eine Firma", "ein Unternehmen")
+❌ KEINE fehlenden Schulen/Unis wenn im Transkript erwähnt
+❌ KEINE fehlenden Stundenzahlen bei Teilzeit
+❌ KEINE fehlenden position-Felder
+✅ Bei Unsicherheit bei company/position: null verwenden (aber nur wenn wirklich unklar!)
 ✅ Temporale Annotationen [≈Jahr] nutzen
-✅ JEDE Experience detailliert beschreiben
+✅ JEDE Experience detailliert beschreiben mit erkennbarem Schwerpunkt
+✅ Position IMMER als konkrete Berufsbezeichnung
+✅ Hauptjob vs Nebenjob durch employment_type unterscheiden
 """
     
     def _build_transcript_context(
@@ -381,6 +476,16 @@ KRITISCHE REGELN:
         context += "\n\nExtrahiere nun die strukturierten Lebenslaufdaten als JSON:"
         
         return context
+
+
+
+
+
+
+
+
+
+
 
 
 

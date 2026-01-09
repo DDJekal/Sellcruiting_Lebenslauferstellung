@@ -136,9 +136,11 @@ class MandantenConfig(BaseModel):
 class Experience(BaseModel):
     """Work experience entry."""
     id: int
+    position: Optional[str] = Field(default=None, description="Job title/position (e.g. 'Konstrukteur', 'Projektleiter')")
     start: Optional[str] = Field(default=None, description="Start date (YYYY-MM-DD)")
     end: Optional[str] = Field(default=None, description="End date (YYYY-MM-DD) or None if current")
     company: Optional[str] = Field(default=None, description="Company name or None if unknown")
+    employment_type: Optional[str] = Field(default=None, description="'Hauptjob', 'Nebenjob', 'Praktikum', 'Werkstudent', 'Duales Studium', etc.")
     tasks: str = Field(default="", description="Description of tasks and responsibilities")
 
 
