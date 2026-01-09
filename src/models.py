@@ -155,6 +155,7 @@ class Education(BaseModel):
 class Resume(BaseModel):
     """Resume/CV data structure."""
     id: int
+    summary: Optional[str] = Field(default=None, description="Qualification summary (e.g. 'Bewerber qualifiziert: Alle 2 zwingenden Kriterien erfüllt.')")
     preferred_contact_time: Optional[str] = None
     preferred_workload: Optional[str] = None
     willing_to_relocate: Optional[str] = None

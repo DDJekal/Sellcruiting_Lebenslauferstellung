@@ -172,6 +172,9 @@ def process_elevenlabs_call(webhook_data: Dict[str, Any]) -> Dict[str, Any]:
         temporal_context=temporal_context
     )
     
+    # Add qualification summary to resume
+    applicant_resume.resume.summary = qualification_evaluation["summary"]
+    
     # Save outputs (optional, for debugging)
     output_dir = Path("Output")
     output_dir.mkdir(exist_ok=True)
