@@ -61,8 +61,9 @@ def main():
         temporal_context=filled_protocol_data.get("temporal_context")
     )
     
-    print("\n[3] Fuege Qualification Summary zum Resume hinzu...")
+    print("\n[3] Fuege Qualification Summary und Status zum Resume hinzu...")
     applicant_resume.resume.summary = qualification["summary"]
+    applicant_resume.resume.qualified = qualification["is_qualified"]
     
     # Save resume with qualification
     output_path = Path("Output/resume_with_qualification.json")
@@ -77,8 +78,9 @@ def main():
     print("=" * 80)
     print(f"\nApplicant ID: {applicant_resume.applicant.id}")
     print(f"Name: {applicant_resume.applicant.first_name} {applicant_resume.applicant.last_name}")
-    print(f"\nQUALIFICATION SUMMARY:")
-    print(f"  {applicant_resume.resume.summary}")
+    print(f"\nQUALIFICATION:")
+    print(f"  Qualified: {applicant_resume.resume.qualified}")
+    print(f"  Summary: {applicant_resume.resume.summary}")
     print(f"\nExperiences: {len(applicant_resume.resume.experiences)}")
     print(f"Educations: {len(applicant_resume.resume.educations)}")
     
