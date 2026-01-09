@@ -121,6 +121,66 @@ class Validator:
         
         return filled_protocol
     
+    def evaluate_qualification(
+        self,
+        filled_protocol: FilledProtocol,
+        mandanten_config: MandantenConfig
+    ) -> Dict[str, Any]:
+        """
+        Evaluate if applicant is qualified based on must-criteria.
+        
+        Returns:
+            Dict with qualification status, summary text, and details
+        """
+        # Check must-criteria
+        errors = self.validate_must_criteria(filled_protocol, mandanten_config)
+        
+        # Build prompt lookup for additional analysis
+        prompts_by_id = {}
+        for page in filled_protocol.pages:
+            for prompt in page.prompts:
+                prompts_by_id[prompt.id] = prompt
+        
+        # Count fulfilled criteria
+        total_criteria = len(mandanten_config.must_criteria)
+        fulfilled_criteria = total_criteria - len(errors)
+        
+        # Determine qualification status
+        is_qualified = len(errors) == 0
+        
+        # Build summary text
+        if is_qualified:
+            if total_criteria > 0:
+                summary = f"Bewerber qualifiziert: Alle {total_criteria} zwingenden Kriterien erfüllt."
+            else:
+                summary = "Bewerber qualifiziert: Keine zwingenden Kriterien definiert."
+        else:
+            summary = f"Bewerber nicht qualifiziert: {len(errors)} von {total_criteria} zwingenden Kriterien nicht erfüllt."
+        
+        # Detailed breakdown (optional)
+        criteria_details = []
+        for criterion in mandanten_config.must_criteria:
+            prompt = prompts_by_id.get(criterion.prompt_id)
+            if prompt:
+                is_fulfilled = prompt.answer.checked == criterion.expected
+                criteria_details.append({
+                    "prompt_id": criterion.prompt_id,
+                    "question": prompt.question,
+                    "expected": criterion.expected,
+                    "actual": prompt.answer.checked,
+                    "fulfilled": is_fulfilled,
+                    "confidence": prompt.answer.confidence
+                })
+        
+        return {
+            "is_qualified": is_qualified,
+            "summary": summary,
+            "fulfilled_count": fulfilled_criteria,
+            "total_count": total_criteria,
+            "errors": errors,
+            "criteria_details": criteria_details
+        }
+    
     def _evaluate_condition(self, field_value: Any, operator: str, expected_value: Any) -> bool:
         """Evaluate a single condition."""
         if operator == "==":

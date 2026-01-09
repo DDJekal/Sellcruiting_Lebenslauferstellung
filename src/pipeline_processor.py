@@ -162,6 +162,9 @@ def process_elevenlabs_call(webhook_data: Dict[str, Any]) -> Dict[str, Any]:
     filled_protocol = validator.apply_implicit_defaults(filled_protocol, mandanten_config)
     filled_protocol = validator.apply_routing_rules(filled_protocol, mandanten_config)
     
+    # Evaluate qualification
+    qualification_evaluation = validator.evaluate_qualification(filled_protocol, mandanten_config)
+    
     # Build resume
     applicant_resume = resume_builder.build_resume(
         transcript=transcript,
@@ -230,6 +233,7 @@ def process_elevenlabs_call(webhook_data: Dict[str, Any]) -> Dict[str, Any]:
         "campaign_id": campaign_id,
         "applicant_id": applicant_resume.applicant.id,
         "protocol_source": protocol_source,
+        "qualification": qualification_evaluation,  # NEW: Include qualification
         "elevenlabs": metadata,
         "temporal_context": temporal_context,
         "processing": {
@@ -253,6 +257,7 @@ def process_elevenlabs_call(webhook_data: Dict[str, Any]) -> Dict[str, Any]:
         "conversation_id": conversation_id,
         "campaign_id": campaign_id,
         "protocol_source": protocol_source,
+        "qualification": qualification_evaluation,  # NEW: Qualification evaluation
         "applicant_id": applicant_resume.applicant.id,
         "resume_id": applicant_resume.resume.id,
         "applicant": applicant_resume.applicant.model_dump(),
