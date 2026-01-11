@@ -4,7 +4,7 @@ import json
 from typing import Dict, Any, List
 from openai import OpenAI
 
-from src.models import ShadowType, PromptAnswer, Evidence, PromptType
+from models import ShadowType, PromptAnswer, Evidence, PromptType
 
 
 class Extractor:
