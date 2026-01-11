@@ -104,6 +104,9 @@ AUFGABE:
 REGELN FÜR QUALIFIKATIONSFRAGEN (HÖCHSTE PRIORITÄT)
 ═══════════════════════════════════════════════════════════════════
 
+⚠️ GRUNDPRINZIP: "BENEFIT OF THE DOUBT" - Im Zweifel FÜR den Kandidaten!
+⚠️ GROSSZÜGIG BEWERTEN: Berufserfahrung im Bereich = Qualifikation!
+
 Qualifikationsfragen erkennen an Keywords:
 - Ausbildung/Studium: "Haben Sie eine Ausbildung...", "Haben Sie studiert..."
 - Berufserfahrung: "Haben Sie Erfahrung...", "Wie lange arbeiten Sie..."
@@ -111,9 +114,7 @@ Qualifikationsfragen erkennen an Keywords:
 - Sprachkenntnisse: "Sprechen Sie...", "Deutschkenntnisse..."
 - Führerschein: "Haben Sie einen Führerschein..."
 
-⚠️ WICHTIG: Qualifikationen erfordern FAKTISCHE ANTWORTEN (nicht nur Zustimmung)
-
-✅ checked: true → Kandidat HAT die Qualifikation:
+✅ checked: true → Kandidat ist QUALIFIZIERT (GROSSZÜGIG):
 
   1. DIREKTE BESTÄTIGUNG (confidence: 0.95-1.0):
   ┌──────────────────────────────────────────────────────────┐
@@ -123,23 +124,28 @@ Qualifikationsfragen erkennen an Keywords:
   │ → checked: true, value: "ja", confidence: 0.95           │
   └──────────────────────────────────────────────────────────┘
   
-  2. IMPLIZITE BESTÄTIGUNG durch Details (confidence: 0.85-0.93):
-  ┌──────────────────────────────────────────────────────────┐
-  │ Frage: "Haben Sie Berufserfahrung in der Pflege?"        │
-  │ Kandidat: "Ich arbeite seit 2020 bei den HEH-Kliniken    │
-  │            als Pflegefachmann."                           │
-  │ → checked: true, value: "seit 2020", confidence: 0.92    │
-  │ → notes: "Implizit durch Positionsnennung bestätigt"     │
-  └──────────────────────────────────────────────────────────┘
-  
-  3. BEILÄUFIGE ERWÄHNUNG im Lebenslauf-Teil (confidence: 0.80-0.90):
+  2. BERUFSERFAHRUNG IM BEREICH = QUALIFIKATION ⭐ (confidence: 0.80-0.90):
   ┌──────────────────────────────────────────────────────────┐
   │ Frage: "Haben Sie eine Ausbildung als Pflegefachmann?"   │
-  │ Kandidat (früher im Gespräch): "...dann habe ich 2020    │
-  │           meine Ausbildung zum Pflegefachmann fertig      │
-  │           gemacht..."                                     │
-  │ → checked: true, value: "ja (2020)", confidence: 0.88    │
-  │ → notes: "Beiläufig im Lebenslauf erwähnt"               │
+  │ Kandidat: "Ich arbeite seit 7 Jahren in der Pflege auf   │
+  │            der Intensivstation."                          │
+  │                                                           │
+  │ → checked: true ✅                                        │
+  │ → value: "7 Jahre Berufserfahrung Intensivstation"      │
+  │ → confidence: 0.85                                        │
+  │ → notes: "Qualifiziert durch langjährige Berufserfahrung"│
+  └──────────────────────────────────────────────────────────┘
+  
+  3. PRAKTISCHE TÄTIGKEIT = QUALIFIKATION ⭐ (confidence: 0.75-0.85):
+  ┌──────────────────────────────────────────────────────────┐
+  │ Frage: "Haben Sie Erfahrung in der Altenpflege?"         │
+  │ Kandidat: "Ich habe 2 Jahre in einem Altenheim          │
+  │            gearbeitet."                                   │
+  │                                                           │
+  │ → checked: true ✅                                        │
+  │ → value: "2 Jahre Altenheim"                            │
+  │ → confidence: 0.80                                        │
+  │ → notes: "Qualifiziert durch praktische Erfahrung"      │
   └──────────────────────────────────────────────────────────┘
   
   4. ÄQUIVALENTE QUALIFIKATION (confidence: 0.85-0.92):
@@ -151,20 +157,70 @@ Qualifikationsfragen erkennen an Keywords:
   │                          pfleger", confidence: 0.90       │
   │ → notes: "Äquivalente Qualifikation im Pflegebereich"    │
   └──────────────────────────────────────────────────────────┘
+  
+  5. VERWANDTE QUALIFIKATION ⭐ (confidence: 0.75-0.85):
+  ┌──────────────────────────────────────────────────────────┐
+  │ Frage: "Haben Sie eine Ausbildung als Koch?"             │
+  │ Kandidat: "Ich bin Restaurantfachmann und habe 3 Jahre   │
+  │            in der Küche gearbeitet."                      │
+  │                                                           │
+  │ → checked: true ✅                                        │
+  │ → value: "Restaurantfachmann mit 3 Jahren Küchenerfahrung"│
+  │ → confidence: 0.80                                        │
+  │ → notes: "Verwandte Qualifikation im Gastro-Bereich"    │
+  └──────────────────────────────────────────────────────────┘
+  
+  6. IMPLIZITE KOMPETENZ DURCH POSITION (confidence: 0.75-0.85):
+  ┌──────────────────────────────────────────────────────────┐
+  │ Frage: "Haben Sie Führungserfahrung?"                    │
+  │ Kandidat: "Ich war 5 Jahre stellvertretender Leiter      │
+  │            der Abteilung."                                │
+  │                                                           │
+  │ → checked: true ✅                                        │
+  │ → value: "5 Jahre stellv. Leitung"                      │
+  │ → confidence: 0.82                                        │
+  │ → notes: "Position impliziert Führungsverantwortung"    │
+  └──────────────────────────────────────────────────────────┘
+  
+  7. BEILÄUFIGE ERWÄHNUNG im Lebenslauf (confidence: 0.75-0.88):
+  ┌──────────────────────────────────────────────────────────┐
+  │ Frage: "Haben Sie eine Ausbildung als Pflegefachmann?"   │
+  │ Kandidat (früher im Gespräch): "...dann habe ich 2020    │
+  │           meine Ausbildung zum Pflegefachmann fertig      │
+  │           gemacht..."                                     │
+  │ → checked: true, value: "ja (2020)", confidence: 0.85    │
+  │ → notes: "Beiläufig im Lebenslauf erwähnt"               │
+  └──────────────────────────────────────────────────────────┘
 
-❌ checked: false → Kandidat HAT die Qualifikation NICHT:
-  - Explizite Verneinung: "Nein, habe ich nicht"
-  - Andere Qualifikation: "Ich bin Restaurantfachmann" (bei Frage nach Koch)
+❌ checked: false → NUR bei EINDEUTIGER NICHT-ERFÜLLUNG:
+  - Explizite Verneinung: "Nein, das habe ich nicht"
+  - Komplett andere Branche ohne Bezug: "Ich bin IT-Spezialist" (bei Frage nach Pflege)
+  - ⚠️ NICHT bei unklaren Antworten oder fehlenden Details!
 
-⚠️ checked: null → UNKLAR oder NICHT ERWÄHNT:
-  - Qualifikation wird nirgendwo im Transkript erwähnt
-  - Unklare Antwort ohne konkrete Qualifikation
+⚠️ checked: null → NUR wenn GAR NICHTS im Transkript:
+  - Thema wird überhaupt nicht erwähnt
+  - Keine relevanten Informationen vorhanden
+  - ⚠️ NICHT verwenden wenn irgendwelche relevanten Infos da sind!
 
-KRITISCH für Qualifikationen:
+═══════════════════════════════════════════════════════════════════
+⭐ KRITISCHE "BENEFIT OF THE DOUBT" REGELN ⭐
+═══════════════════════════════════════════════════════════════════
+
+1. Bei Unsicherheit (60-80% sicher) → checked: true mit confidence 0.70-0.80
+2. Berufserfahrung im Bereich ≥ 1 Jahr → ZÄHLT ALS QUALIFIKATION
+3. Verwandte/ähnliche Qualifikationen → AKZEPTIEREN
+4. Praktische Erfahrung > formale Zertifikate
+5. Position/Jobtitel impliziert Kompetenz → AKZEPTIEREN
+6. Im Zweifel: lieber checked: true (niedrige confidence) als checked: null
+
 ✅ Durchsuche das GESAMTE Transkript - oft werden Qualifikationen zu Beginn erwähnt
 ✅ Auch Lebenslauf-Abschnitte beachten: "dann habe ich die Ausbildung bei..."
 ✅ Bei Mehrfachoptionen ("A oder B oder C?"): Wenn EINE Option erfüllt → checked: true
 ✅ Äquivalente Qualifikationen akzeptieren (z.B. "Krankenpfleger" für "Pflegefachmann")
+
+❌ NUR bei KLARER Nicht-Erfüllung → checked: false
+❌ NUR bei KOMPLETTEM Fehlen → checked: null
+
 
 ═══════════════════════════════════════════════════════════════════
 REGELN FÜR ARBEITSZEITFRAGEN (KRITISCH)
