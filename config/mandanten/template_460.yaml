@@ -1,0 +1,76 @@
+# Beispiel-Config für Kampagne 460 (Pflegebereich)
+# Mit flexiblen Qualification Groups
+
+mandant_id: template_460
+protokoll_template_id: 460
+
+heuristic_rules: []
+info_page_names: []
+grounding: {}
+
+aida_phase_mapping:
+  interest: []
+  action: []
+
+# Legacy must_criteria (leer, da wir qualification_groups verwenden)
+must_criteria: []
+
+# NEU: Flexible Qualification Groups mit OR/AND-Logik
+qualification_groups:
+  # Gruppe 1: Ausbildung im Pflegebereich (OR - mindestens eine Option)
+  - group_id: ausbildung_pflege
+    group_name: "Ausbildung im Pflegebereich"
+    logic: OR
+    min_required: 1
+    is_mandatory: true
+    error_msg: "Keine anerkannte Pflegeausbildung nachgewiesen"
+    options:
+      # Mehrere mögliche Ausbildungen - Kandidat muss nur EINE haben
+      - prompt_id: 1001
+        description: "Ausbildung Pflegefachmann/-frau"
+        weight: 1.0
+      - prompt_id: 1002
+        description: "Ausbildung Gesundheits- und Krankenpfleger/in"
+        weight: 1.0
+      - prompt_id: 1003
+        description: "Ausbildung Altenpfleger/in"
+        weight: 1.0
+      - prompt_id: 1004
+        description: "Ausbildung Krankenpflegehelfer/in"
+        weight: 0.8
+
+  # Gruppe 2: Berufserfahrung (optional, aber empfohlen)
+  - group_id: berufserfahrung
+    group_name: "Berufserfahrung"
+    logic: OR
+    min_required: 1
+    is_mandatory: false  # nicht zwingend erforderlich
+    error_msg: "Keine relevante Berufserfahrung"
+    options:
+      - prompt_id: 2001
+        description: "Mindestens 1 Jahr Berufserfahrung"
+        weight: 1.0
+
+  # Gruppe 3: Deutschkenntnisse (zwingend)
+  - group_id: sprache
+    group_name: "Sprachkenntnisse"
+    logic: OR
+    min_required: 1
+    is_mandatory: true
+    error_msg: "Deutschkenntnisse B2 nicht nachgewiesen"
+    options:
+      - prompt_id: 3001
+        description: "Deutschkenntnisse mindestens B2"
+        weight: 1.0
+
+routing_rules: []
+
+implicit_defaults:
+  # Deutschkenntnisse implizit annehmen, wenn Gespräch auf Deutsch geführt wurde
+  - prompt_id: 3001
+    reasoning: "Gespräch wurde auf Deutsch geführt"
+    default_answer:
+      checked: true
+      value: "ja"
+      confidence: 0.8
+      notes: "Implizit angenommen (Gespräch auf Deutsch)"

@@ -80,6 +80,24 @@ class MustCriterion(BaseModel):
     error_msg: str
 
 
+class QualificationOption(BaseModel):
+    """Single qualification option within a group."""
+    prompt_id: int
+    description: str
+    weight: float = Field(default=1.0, ge=0.0, le=1.0, description="Weight for partial scoring")
+
+
+class QualificationGroup(BaseModel):
+    """Group of qualification criteria with flexible logic."""
+    group_id: str
+    group_name: str
+    logic: str = Field(default="OR", description="AND (all required) or OR (at least one required)")
+    options: List[QualificationOption]
+    min_required: int = Field(default=1, description="Minimum number of fulfilled options (for OR logic)")
+    is_mandatory: bool = Field(default=True, description="Whether this group must be fulfilled")
+    error_msg: Optional[str] = None
+
+
 class RoutingCondition(BaseModel):
     """Condition for routing rule."""
     prompt: int
@@ -126,7 +144,8 @@ class MandantenConfig(BaseModel):
     info_page_names: List[str] = Field(default_factory=list)
     grounding: Dict[str, Any] = Field(default_factory=dict)
     aida_phase_mapping: Dict[str, List[int]] = Field(default_factory=dict)
-    must_criteria: List[MustCriterion] = Field(default_factory=list)
+    must_criteria: List[MustCriterion] = Field(default_factory=list)  # Legacy support
+    qualification_groups: List[QualificationGroup] = Field(default_factory=list)  # Neu: flexible Gruppen
     routing_rules: List[RoutingRule] = Field(default_factory=list)
     implicit_defaults: List[ImplicitDefault] = Field(default_factory=list)
 

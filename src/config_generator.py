@@ -37,6 +37,7 @@ class ConfigGenerator:
             "grounding": self._extract_grounding_defaults(protocol),
             "aida_phase_mapping": self._generate_aida_mapping(protocol),
             "must_criteria": self._extract_must_criteria(protocol),
+            "qualification_groups": self._extract_qualification_groups(protocol),  # Neu
             "routing_rules": [],  # Empty by default, user can add manually
             "implicit_defaults": self._generate_implicit_defaults(protocol)
         }
@@ -219,6 +220,181 @@ class ConfigGenerator:
                     })
         
         return must_criteria
+    
+    def _extract_qualification_groups(self, protocol: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        Extract qualification groups with intelligent pattern detection.
+        
+        Erkennt:
+        1. Einzelne Qualifikationsfragen (automatisch als OR-Gruppe)
+        2. Mehrfachoptionen in einer Frage (z.B. "Ausbildung als A, B oder C?")
+        3. Mehrere verwandte Fragen (z.B. gruppiert nach "Ausbildung", "Erfahrung")
+        """
+        qualification_groups = []
+        
+        # Kategorien für Gruppierung
+        categories = {
+            "ausbildung": {
+                "keywords": ["ausbildung", "studium", "abschluss", "qualifikation"],
+                "patterns": [
+                    r"ausbildung\s+(?:als|zum|zur)\s+([\w\s,\-]+(?:\s+oder\s+[\w\s,\-]+)*)",
+                    r"abschluss\s+(?:als|in)\s+([\w\s,\-]+(?:\s+oder\s+[\w\s,\-]+)*)",
+                    r"studium\s+(?:der|in)?\s*([\w\s,\-]+(?:\s+oder\s+[\w\s,\-]+)*)"
+                ]
+            },
+            "erfahrung": {
+                "keywords": ["berufserfahrung", "jahre erfahrung", "erfahrung in", "erfahrung als"],
+                "patterns": [
+                    r"(\d+)\s+jahre?\s+(?:berufs)?erfahrung",
+                    r"erfahrung\s+(?:als|in)\s+([\w\s,\-]+)"
+                ]
+            },
+            "zertifikate": {
+                "keywords": ["zertifikat", "zertifizierung", "lizenz", "berechtigung", "nachweis"],
+                "patterns": [
+                    r"zertifikat\s+([\w\s,\-]+(?:\s+oder\s+[\w\s,\-]+)*)",
+                    r"nachweis\s+(?:über|von)?\s*([\w\s,\-]+)"
+                ]
+            },
+            "sprachen": {
+                "keywords": ["sprachkenntnisse", "deutschkenntnisse", "englischkenntnisse"],
+                "patterns": [
+                    r"(deutsch|englisch|französisch)kenntnisse.*([abc][12])",
+                    r"sprach(?:kenntnisse|niveau).*([abc][12])"
+                ]
+            },
+            "fuehrerschein": {
+                "keywords": ["führerschein", "fahrerlaubnis"],
+                "patterns": [
+                    r"führerschein.*klasse\s+([a-z0-9,\s]+)"
+                ]
+            }
+        }
+        
+        # Sammle Fragen nach Kategorie
+        categorized_questions = {cat: [] for cat in categories}
+        
+        for page in protocol.get("pages", []):
+            for prompt in page.get("prompts", []):
+                question = prompt.get("question", "")
+                question_lower = question.lower()
+                prompt_id = prompt.get("id")
+                
+                # Skip Info-Prompts und Routing-Fragen
+                prompt_type = prompt.get("type", "").lower()
+                if prompt_type in ["info", "recruiter_instruction"]:
+                    continue
+                
+                # Skip explizit als "Zwingend:" markierte (werden bereits in must_criteria erfasst)
+                if question_lower.startswith("zwingend:"):
+                    continue
+                
+                # Kategorisiere Frage
+                for category, config in categories.items():
+                    if any(keyword in question_lower for keyword in config["keywords"]):
+                        categorized_questions[category].append({
+                            "prompt_id": prompt_id,
+                            "question": question,
+                            "page": page.get("name", ""),
+                            "question_lower": question_lower
+                        })
+                        break
+        
+        # Erstelle Gruppen aus kategorisierten Fragen
+        group_counter = 1
+        
+        for category, questions in categorized_questions.items():
+            if not questions:
+                continue
+            
+            # Prüfe ob einzelne Frage mehrere Optionen enthält
+            if len(questions) == 1:
+                question_text = questions[0]["question"]
+                question_lower = questions[0]["question_lower"]
+                
+                # Suche nach "oder" Pattern für Mehrfachoptionen
+                if " oder " in question_lower:
+                    options = []
+                    
+                    # Versuche Optionen zu extrahieren
+                    options_extracted = False
+                    for pattern in categories[category].get("patterns", []):
+                        match = re.search(pattern, question_lower, re.IGNORECASE)
+                        if match and match.groups():
+                            # Extrahiere Optionen (getrennt durch "oder" oder ",")
+                            options_text = match.group(1)
+                            option_list = re.split(r'\s+oder\s+|,\s*(?:oder\s+)?', options_text)
+                            
+                            for opt_text in option_list:
+                                opt_text = opt_text.strip()
+                                if opt_text and len(opt_text) > 2:
+                                    options.append({
+                                        "prompt_id": questions[0]["prompt_id"],
+                                        "description": opt_text.title(),
+                                        "weight": 1.0
+                                    })
+                            
+                            if options:
+                                options_extracted = True
+                                break
+                    
+                    if not options_extracted or not options:
+                        # Fallback: Eine Option für die gesamte Frage
+                        options = [{
+                            "prompt_id": questions[0]["prompt_id"],
+                            "description": question_text[:100],
+                            "weight": 1.0
+                        }]
+                    
+                    qualification_groups.append({
+                        "group_id": f"qual_group_{group_counter}",
+                        "group_name": f"Qualifikation: {category.replace('_', ' ').title()}",
+                        "logic": "OR",
+                        "options": options,
+                        "min_required": 1,
+                        "is_mandatory": True,
+                        "error_msg": f"Keine der erforderlichen {category.replace('_', ' ')}-Qualifikationen erfüllt"
+                    })
+                    group_counter += 1
+                else:
+                    # Einzelne Frage ohne Optionen → einfache Gruppe
+                    qualification_groups.append({
+                        "group_id": f"qual_group_{group_counter}",
+                        "group_name": f"Qualifikation: {category.replace('_', ' ').title()}",
+                        "logic": "OR",
+                        "options": [{
+                            "prompt_id": questions[0]["prompt_id"],
+                            "description": question_text[:100],
+                            "weight": 1.0
+                        }],
+                        "min_required": 1,
+                        "is_mandatory": True,
+                        "error_msg": f"{category.replace('_', ' ').title()}-Qualifikation nicht erfüllt"
+                    })
+                    group_counter += 1
+            
+            else:
+                # Mehrere Fragen in der Kategorie → OR-Gruppe (mindestens eine muss erfüllt sein)
+                options = []
+                for q in questions:
+                    options.append({
+                        "prompt_id": q["prompt_id"],
+                        "description": q["question"][:100],
+                        "weight": 1.0
+                    })
+                
+                qualification_groups.append({
+                    "group_id": f"qual_group_{group_counter}",
+                    "group_name": f"Qualifikation: {category.replace('_', ' ').title()}",
+                    "logic": "OR",
+                    "options": options,
+                    "min_required": 1,
+                    "is_mandatory": True,
+                    "error_msg": f"Keine der erforderlichen {category.replace('_', ' ')}-Qualifikationen erfüllt"
+                })
+                group_counter += 1
+        
+        return qualification_groups
     
     def _generate_implicit_defaults(self, protocol: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Generate implicit defaults (e.g., B2 German for German conversation)."""

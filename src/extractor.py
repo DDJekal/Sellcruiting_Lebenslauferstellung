@@ -101,7 +101,73 @@ AUFGABE:
 - Keine Halluzinationen: lieber null + notes
 
 ═══════════════════════════════════════════════════════════════════
-REGELN FÜR yes_no-PROMPTS (VERSCHÄRFT)
+REGELN FÜR QUALIFIKATIONSFRAGEN (HÖCHSTE PRIORITÄT)
+═══════════════════════════════════════════════════════════════════
+
+Qualifikationsfragen erkennen an Keywords:
+- Ausbildung/Studium: "Haben Sie eine Ausbildung...", "Haben Sie studiert..."
+- Berufserfahrung: "Haben Sie Erfahrung...", "Wie lange arbeiten Sie..."
+- Zertifikate: "Besitzen Sie...", "Haben Sie den Nachweis..."
+- Sprachkenntnisse: "Sprechen Sie...", "Deutschkenntnisse..."
+- Führerschein: "Haben Sie einen Führerschein..."
+
+⚠️ WICHTIG: Qualifikationen erfordern FAKTISCHE ANTWORTEN (nicht nur Zustimmung)
+
+✅ checked: true → Kandidat HAT die Qualifikation:
+
+  1. DIREKTE BESTÄTIGUNG (confidence: 0.95-1.0):
+  ┌──────────────────────────────────────────────────────────┐
+  │ Frage: "Haben Sie eine Ausbildung als Pflegefachmann?"   │
+  │ Kandidat: "Ja, ich habe eine Ausbildung als Pflege-      │
+  │            fachmann abgeschlossen."                       │
+  │ → checked: true, value: "ja", confidence: 0.95           │
+  └──────────────────────────────────────────────────────────┘
+  
+  2. IMPLIZITE BESTÄTIGUNG durch Details (confidence: 0.85-0.93):
+  ┌──────────────────────────────────────────────────────────┐
+  │ Frage: "Haben Sie Berufserfahrung in der Pflege?"        │
+  │ Kandidat: "Ich arbeite seit 2020 bei den HEH-Kliniken    │
+  │            als Pflegefachmann."                           │
+  │ → checked: true, value: "seit 2020", confidence: 0.92    │
+  │ → notes: "Implizit durch Positionsnennung bestätigt"     │
+  └──────────────────────────────────────────────────────────┘
+  
+  3. BEILÄUFIGE ERWÄHNUNG im Lebenslauf-Teil (confidence: 0.80-0.90):
+  ┌──────────────────────────────────────────────────────────┐
+  │ Frage: "Haben Sie eine Ausbildung als Pflegefachmann?"   │
+  │ Kandidat (früher im Gespräch): "...dann habe ich 2020    │
+  │           meine Ausbildung zum Pflegefachmann fertig      │
+  │           gemacht..."                                     │
+  │ → checked: true, value: "ja (2020)", confidence: 0.88    │
+  │ → notes: "Beiläufig im Lebenslauf erwähnt"               │
+  └──────────────────────────────────────────────────────────┘
+  
+  4. ÄQUIVALENTE QUALIFIKATION (confidence: 0.85-0.92):
+  ┌──────────────────────────────────────────────────────────┐
+  │ Frage: "Haben Sie eine Ausbildung als Pflegefachmann?"   │
+  │ Kandidat: "Ich bin ausgebildeter Gesundheits- und        │
+  │            Krankenpfleger."                               │
+  │ → checked: true, value: "Gesundheits- und Kranken-       │
+  │                          pfleger", confidence: 0.90       │
+  │ → notes: "Äquivalente Qualifikation im Pflegebereich"    │
+  └──────────────────────────────────────────────────────────┘
+
+❌ checked: false → Kandidat HAT die Qualifikation NICHT:
+  - Explizite Verneinung: "Nein, habe ich nicht"
+  - Andere Qualifikation: "Ich bin Restaurantfachmann" (bei Frage nach Koch)
+
+⚠️ checked: null → UNKLAR oder NICHT ERWÄHNT:
+  - Qualifikation wird nirgendwo im Transkript erwähnt
+  - Unklare Antwort ohne konkrete Qualifikation
+
+KRITISCH für Qualifikationen:
+✅ Durchsuche das GESAMTE Transkript - oft werden Qualifikationen zu Beginn erwähnt
+✅ Auch Lebenslauf-Abschnitte beachten: "dann habe ich die Ausbildung bei..."
+✅ Bei Mehrfachoptionen ("A oder B oder C?"): Wenn EINE Option erfüllt → checked: true
+✅ Äquivalente Qualifikationen akzeptieren (z.B. "Krankenpfleger" für "Pflegefachmann")
+
+═══════════════════════════════════════════════════════════════════
+REGELN FÜR yes_no-PROMPTS (Rahmenbedingungen)
 ═══════════════════════════════════════════════════════════════════
 
 ✅ checked: true, value: "ja" → Kandidat stimmt EINDEUTIG zu:

@@ -15,6 +15,7 @@ from extractor import Extractor
 from mapper import Mapper
 from validator import Validator
 from resume_builder import ResumeBuilder
+from qualification_matcher import QualificationMatcher
 from questionnaire_client import QuestionnaireClient
 from questionnaire_transformer import QuestionnaireTransformer
 from models import MandantenConfig
@@ -131,6 +132,7 @@ def process_elevenlabs_call(webhook_data: Dict[str, Any]) -> Dict[str, Any]:
     mapper = Mapper()
     validator = Validator()
     resume_builder = ResumeBuilder()
+    qualification_matcher = QualificationMatcher()  # NEU: Smart Matcher
     
     # Infer shadow types
     shadow_types = type_enricher.infer_types(protocol, mandanten_config)
@@ -158,19 +160,27 @@ def process_elevenlabs_call(webhook_data: Dict[str, Any]) -> Dict[str, Any]:
     # Map to filled protocol
     filled_protocol = mapper.map_answers(protocol, shadow_types, extracted_answers)
     
-    # Apply implicit defaults and routing
-    filled_protocol = validator.apply_implicit_defaults(filled_protocol, mandanten_config)
-    filled_protocol = validator.apply_routing_rules(filled_protocol, mandanten_config)
-    
-    # Evaluate qualification
-    qualification_evaluation = validator.evaluate_qualification(filled_protocol, mandanten_config)
-    
-    # Build resume
+    # Build resume BEFORE enrichment (unstrukturierte Extraktion)
     applicant_resume = resume_builder.build_resume(
         transcript=transcript,
         elevenlabs_metadata=metadata,
         temporal_context=temporal_context
     )
+    
+    # NEUE STUFE: Enrich protocol with resume data (Smart Matching)
+    logger.info("Enriching protocol with resume data (Smart Matching)...")
+    filled_protocol = qualification_matcher.enrich_protocol_with_resume(
+        filled_protocol=filled_protocol,
+        resume=applicant_resume.resume,
+        confidence_threshold=0.85
+    )
+    
+    # Apply implicit defaults and routing
+    filled_protocol = validator.apply_implicit_defaults(filled_protocol, mandanten_config)
+    filled_protocol = validator.apply_routing_rules(filled_protocol, mandanten_config)
+    
+    # Evaluate qualification (jetzt mit enriched protocol!)
+    qualification_evaluation = validator.evaluate_qualification(filled_protocol, mandanten_config)
     
     # Add qualification summary and status to resume
     applicant_resume.resume.summary = qualification_evaluation["summary"]
