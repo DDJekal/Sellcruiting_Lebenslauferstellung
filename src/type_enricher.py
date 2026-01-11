@@ -6,7 +6,7 @@ from typing import Dict, List, Any
 import os
 from openai import OpenAI
 
-from models import ShadowType, PromptType, MandantenConfig
+from src.models import ShadowType, PromptType, MandantenConfig
 
 
 class TypeEnricher:
@@ -113,6 +113,38 @@ class TypeEnricher:
                 )
         
         # General heuristics
+        
+        # 1. AUSWAHLFRAGEN: "Station: A, B, C, D" oder "Schicht: X, Y, Z"
+        # Pattern: "Begriff: Option1, Option2, Option3"
+        if re.search(r':\s*[\w\säüöÄÜÖß\-]+,\s*[\w\säüöÄÜÖß\-]+,', question):
+            # Zähle Kommas - wenn >= 2, dann sind es mehrere Optionen
+            comma_count = question.count(',')
+            if comma_count >= 2:
+                return ShadowType(
+                    prompt_id=prompt["id"],
+                    inferred_type=PromptType.TEXT,  # oder TEXT_LIST wenn Mehrfachauswahl möglich
+                    confidence=0.94,
+                    reasoning=f"Auswahlfrage mit {comma_count+1} Optionen (Format: 'X: A, B, C')"
+                )
+        
+        # 2. ARBEITSZEITFRAGEN: "Vollzeit: X Std" oder "Teilzeit"
+        if re.search(r'(vollzeit|teilzeit).*:.*\d+.*std', q_lower):
+            return ShadowType(
+                prompt_id=prompt["id"],
+                inferred_type=PromptType.YES_NO_WITH_DETAILS,
+                confidence=0.93,
+                reasoning="Arbeitszeitfrage mit Stundenzahl"
+            )
+        
+        if re.search(r'(vollzeit|teilzeit).*:', q_lower):
+            return ShadowType(
+                prompt_id=prompt["id"],
+                inferred_type=PromptType.YES_NO,
+                confidence=0.91,
+                reasoning="Arbeitszeitfrage"
+            )
+        
+        # 3. STANDARD: "Zwingend:" oder "Wünschenswert:"
         if q_lower.startswith("zwingend:") or q_lower.startswith("wünschenswert:"):
             return ShadowType(
                 prompt_id=prompt["id"],
@@ -197,6 +229,38 @@ Frage: "Seit wann sind Sie in Ihrer aktuellen Position tätig?"
 BEISPIEL 5:
 Frage: "Akzeptieren Sie Vollzeit (40 Stunden/Woche)?"
 → {
+  "prompt_id": 5,
+  "inferred_type": "yes_no",
+  "confidence": 0.96,
+  "reasoning": "Binäre Akzeptanzfrage für Arbeitszeit"
+}
+
+BEISPIEL 6:
+Frage: "Station: Intensivstation, Geriatrie, Kardiologie, ZNA"
+→ {
+  "prompt_id": 6,
+  "inferred_type": "text",
+  "confidence": 0.94,
+  "reasoning": "Auswahlfrage mit mehreren Optionen (Kandidat wählt eine oder mehrere)"
+}
+
+BEISPIEL 7:
+Frage: "Vollzeit: 38,5Std/Woche"
+→ {
+  "prompt_id": 7,
+  "inferred_type": "yes_no_with_details",
+  "confidence": 0.92,
+  "reasoning": "Arbeitszeitfrage mit konkreter Stundenzahl"
+}
+
+BEISPIEL 8:
+Frage: "Teilzeit: flexibel"
+→ {
+  "prompt_id": 8,
+  "inferred_type": "yes_no_with_details",
+  "confidence": 0.91,
+  "reasoning": "Arbeitszeitfrage mit Flexibilitätsangabe"
+}
   "prompt_id": 5,
   "inferred_type": "yes_no",
   "confidence": 0.98,

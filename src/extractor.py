@@ -4,7 +4,7 @@ import json
 from typing import Dict, Any, List
 from openai import OpenAI
 
-from models import ShadowType, PromptAnswer, Evidence, PromptType
+from src.models import ShadowType, PromptAnswer, Evidence, PromptType
 
 
 class Extractor:
@@ -165,6 +165,102 @@ KRITISCH für Qualifikationen:
 ✅ Auch Lebenslauf-Abschnitte beachten: "dann habe ich die Ausbildung bei..."
 ✅ Bei Mehrfachoptionen ("A oder B oder C?"): Wenn EINE Option erfüllt → checked: true
 ✅ Äquivalente Qualifikationen akzeptieren (z.B. "Krankenpfleger" für "Pflegefachmann")
+
+═══════════════════════════════════════════════════════════════════
+REGELN FÜR ARBEITSZEITFRAGEN (KRITISCH)
+═══════════════════════════════════════════════════════════════════
+
+Bei Fragen zu Vollzeit/Teilzeit mit Stundenzahlen:
+
+⚠️ WICHTIG: Wenn Kandidat konkrete Stundenzahl nennt, müssen BEIDE Fragen gefüllt werden!
+
+BEISPIEL 1 - Kandidat nennt Stundenzahl (z.B. "35 Stunden"):
+┌────────────────────────────────────────────────────────────────┐
+│ Frage 1: "Vollzeit: 38,5Std/Woche" oder "Vollzeit: 40h"        │
+│ Kandidat: "Ich möchte 35 Stunden arbeiten"                     │
+│                                                                 │
+│ → checked: false (35 ≠ 38,5)                                   │
+│ → value: "nein (35h)"                                          │
+│ → confidence: 0.95                                             │
+│ → notes: "Kandidat will 35h (Teilzeit)"                       │
+└────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────┐
+│ Frage 2: "Teilzeit: flexibel" oder "Teilzeit"                  │
+│ Kandidat: "Ich möchte 35 Stunden arbeiten"                     │
+│                                                                 │
+│ → checked: true                                                │
+│ → value: "35 Stunden"                                          │
+│ → confidence: 0.95                                             │
+│ → notes: "Kandidat nennt konkret 35 Stunden"                  │
+└────────────────────────────────────────────────────────────────┘
+
+BEISPIEL 2 - Kandidat sagt "Vollzeit":
+┌────────────────────────────────────────────────────────────────┐
+│ Frage 1: "Vollzeit: 38,5Std/Woche"                             │
+│ Kandidat: "Ja, Vollzeit passt mir"                             │
+│                                                                 │
+│ → checked: true                                                │
+│ → value: "ja"                                                  │
+│ → confidence: 0.95                                             │
+└────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────┐
+│ Frage 2: "Teilzeit: flexibel"                                  │
+│ → checked: false                                               │
+│ → value: "nein"                                                │
+│ → confidence: 0.92                                             │
+│ → notes: "Kandidat will Vollzeit"                             │
+└────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════
+REGELN FÜR AUSWAHLFRAGEN (KRITISCH)
+═══════════════════════════════════════════════════════════════════
+
+Fragen mit mehreren Optionen (z.B. "Station: A, B, C, D"):
+
+⚠️ NICHT als yes_no behandeln!
+✅ Als TEXT oder TEXT_LIST behandeln!
+✅ IMMER den value mit der konkreten Auswahl füllen!
+
+BEISPIEL 1 - Eine Option gewählt:
+┌────────────────────────────────────────────────────────────────┐
+│ Frage: "Station: Intensivstation, Geriatrie, Kardiologie, ZNA" │
+│ Kandidat: "Ich möchte auf der Intensivstation arbeiten"        │
+│                                                                 │
+│ → checked: null (nicht relevant bei Auswahlfragen)             │
+│ → value: "Intensivstation"                                     │
+│ → confidence: 0.95                                             │
+│ → notes: "Kandidat wählt Intensivstation"                     │
+└────────────────────────────────────────────────────────────────┘
+
+BEISPIEL 2 - Mehrere Optionen:
+┌────────────────────────────────────────────────────────────────┐
+│ Frage: "Station: Intensivstation, Geriatrie, Kardiologie, ZNA" │
+│ Kandidat: "Intensiv oder Kardiologie wäre gut"                 │
+│                                                                 │
+│ → checked: null                                                │
+│ → value: ["Intensivstation", "Kardiologie"]                   │
+│ → confidence: 0.92                                             │
+│ → notes: "Kandidat offen für 2 Stationen"                     │
+└────────────────────────────────────────────────────────────────┘
+
+BEISPIEL 3 - Flexibel/Alle:
+┌────────────────────────────────────────────────────────────────┐
+│ Frage: "Station: Intensivstation, Geriatrie, Kardiologie, ZNA" │
+│ Kandidat: "Bin flexibel, alle Stationen ok"                    │
+│                                                                 │
+│ → checked: null                                                │
+│ → value: "flexibel (alle Stationen)"                          │
+│ → confidence: 0.88                                             │
+│ → notes: "Kandidat hat keine Präferenz"                       │
+└────────────────────────────────────────────────────────────────┘
+
+KRITISCH bei Auswahlfragen:
+✅ IMMER value mit konkreter Auswahl setzen!
+✅ Bei Liste von Optionen in Frage → extrahiere die gewählte(n)
+✅ checked bleibt null bei Auswahlfragen
+❌ NICHT nur checked=true ohne value!
 
 ═══════════════════════════════════════════════════════════════════
 REGELN FÜR yes_no-PROMPTS (Rahmenbedingungen)
