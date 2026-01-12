@@ -4,17 +4,23 @@ import json
 import hashlib
 from typing import Dict, List, Any
 import os
-from openai import OpenAI
 
 from models import ShadowType, PromptType, MandantenConfig
+from llm_client import LLMClient
 
 
 class TypeEnricher:
     """Infers prompt types using heuristics + LLM fallback."""
     
-    def __init__(self, api_key: str = None):
-        """Initialize with OpenAI API key."""
-        self.client = OpenAI(api_key=api_key or os.getenv("OPENAI_API_KEY"))
+    def __init__(self, api_key: str = None, prefer_claude: bool = True):
+        """
+        Initialize type enricher.
+        
+        Args:
+            api_key: Deprecated (uses env vars now)
+            prefer_claude: Use Claude for type classification (default: True, Claude erkennt Typen besser)
+        """
+        self.llm_client = LLMClient(prefer_claude=prefer_claude)
         self.cache: Dict[str, ShadowType] = {}
     
     def infer_types(self, protocol: Dict[str, Any], mandanten_config: MandantenConfig) -> Dict[int, ShadowType]:
@@ -352,6 +358,44 @@ WICHTIG:
 - Analysiere JEDE Frage einzeln
 - Nutze die Examples als Orientierung
 - Im Zweifel: "text" als Fallback (confidence < 0.7)
+
+═══════════════════════════════════════════════════════════════════
+ERWEITERTE ERKENNUNGSREGELN (KRITISCH!)
+═══════════════════════════════════════════════════════════════════
+
+1. QUALIFIKATIONSFRAGEN erkennen:
+   Keywords: "Ausbildung", "Studium", "Zertifikat", "Erfahrung", "Jahre"
+   → Meist: "yes_no" (wenn "Haben Sie...?")
+   → Manchmal: "text" (wenn "Welche Ausbildung...?")
+
+2. AUSWAHLFRAGEN MIT MEHREREN OPTIONEN:
+   Format: "Station: Intensivstation, Notaufnahme, Innere Medizin"
+   → type: "text" (nicht "yes_no"!)
+   → Kandidat wählt eine oder mehrere aus
+
+3. ARBEITSZEITFRAGEN MIT STUNDENZAHL:
+   Format: "Vollzeit: 38,5 Std/Woche" oder "Teilzeit: flexibel"
+   → type: "yes_no_with_details"
+   → Es gibt meist BEIDE Fragen (Vollzeit UND Teilzeit)
+
+4. JA/NEIN MIT NACHFRAGE:
+   "Haben Sie X?" + "Falls ja, welche?"
+   → Erste Frage: "yes_no"
+   → Zweite Frage: "text" oder "text_list"
+
+5. MEHRZEILIGE BESCHREIBUNGEN:
+   "Beschreiben Sie Ihre Aufgaben", "Was motiviert Sie?"
+   → type: "text" (nicht "text_list"!)
+   → Lange Antworten erwartet
+
+✅ Bei Unsicherheit zwischen "yes_no" und "text":
+   → Schaue auf konkrete Formulierung
+   → "Haben Sie...?" → yes_no
+   → "Welche... haben Sie?" → text/text_list
+
+✅ Bei Unsicherheit zwischen "text" und "text_list":
+   → Einzelne Sache erwartet → text
+   → Mehrere Dinge/Aufzählung → text_list
 """
         
         user_prompt = f"""Klassifiziere diese Prompts nach dem Schema der Examples:
@@ -361,18 +405,16 @@ WICHTIG:
 Antworte nur mit JSON im angegebenen Format."""
         
         try:
-            response = self.client.chat.completions.create(
-                model=os.getenv("OPENAI_MODEL", "gpt-4o-2024-08-06"),
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                response_format={"type": "json_object"},
-                temperature=0
+            # Use LLM client (defaults to GPT-4o for TypeEnricher, works well)
+            response_text = self.llm_client.create_completion(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                temperature=0,
+                max_tokens=2000
             )
             
             # Parse response
-            classifications = json.loads(response.choices[0].message.content)
+            classifications = json.loads(response_text)
             
             # Handle both array and object responses
             if isinstance(classifications, dict) and "prompts" in classifications:

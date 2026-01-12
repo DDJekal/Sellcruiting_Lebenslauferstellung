@@ -4,20 +4,26 @@ import json
 import hashlib
 from typing import List, Dict, Any, Optional
 from datetime import datetime
-from openai import OpenAI
 
 from models import (
     ApplicantResume, Applicant, Resume, 
     Experience, Education
 )
+from llm_client import LLMClient
 
 
 class ResumeBuilder:
     """Builds structured resume from transcript and metadata."""
     
-    def __init__(self, api_key: str = None):
-        """Initialize with OpenAI API key."""
-        self.client = OpenAI(api_key=api_key or os.getenv("OPENAI_API_KEY"))
+    def __init__(self, api_key: str = None, prefer_claude: bool = True):
+        """
+        Initialize with LLM client.
+        
+        Args:
+            api_key: Deprecated (uses env vars now)
+            prefer_claude: Use Claude Sonnet 4.5 primary, GPT-4o fallback
+        """
+        self.llm_client = LLMClient(prefer_claude=prefer_claude)
     
     def build_resume(
         self,
@@ -132,29 +138,43 @@ class ResumeBuilder:
         user_prompt = self._build_transcript_context(transcript, temporal_context)
         
         try:
-            response = self.client.chat.completions.create(
-                model=os.getenv("OPENAI_MODEL", "gpt-4o-2024-08-06"),
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                response_format={"type": "json_object"},
-                temperature=0
+            # Use Claude with OpenAI fallback
+            response_text = self.llm_client.create_completion(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                temperature=0,
+                max_tokens=4000
             )
             
-            result = json.loads(response.choices[0].message.content)
+            result = json.loads(response_text)
             
-            # Parse experiences
+            # Parse experiences with validation
             experiences = []
             for i, exp in enumerate(result.get('experiences', []), start=1):
+                # VALIDATION: Skip experiences without position
+                if not exp.get('position'):
+                    print(f"   [WARN] Experience {i} ohne position - ueberspringe")
+                    continue
+                
+                # Clean vague company names
+                company = exp.get('company')
+                if company and company.lower() in ["eine firma", "ein unternehmen", "firma", "unternehmen"]:
+                    print(f"   [WARN] Vage Firmenbezeichnung '{company}' -> null")
+                    company = None
+                
+                # Validate tasks length
+                tasks = exp.get('tasks', '')
+                if tasks and len(tasks) < 100:
+                    print(f"   [WARN] Tasks zu kurz ({len(tasks)} Zeichen) fuer: {exp.get('position')}")
+                
                 experiences.append(Experience(
                     id=i,
                     position=exp.get('position'),
                     start=exp.get('start'),
                     end=exp.get('end'),
-                    company=exp.get('company') or None,  # Explicitly allow None
+                    company=company,
                     employment_type=exp.get('employment_type'),
-                    tasks=exp.get('tasks', '')
+                    tasks=tasks
                 ))
             
             # Parse educations
@@ -163,7 +183,7 @@ class ResumeBuilder:
                 educations.append(Education(
                     id=i,
                     end=edu.get('end'),
-                    company=edu.get('company') or None,  # Explicitly allow None
+                    company=edu.get('company') or None,
                     description=edu.get('description', '')
                 ))
             

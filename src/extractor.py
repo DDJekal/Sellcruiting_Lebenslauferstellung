@@ -2,17 +2,23 @@
 import os
 import json
 from typing import Dict, Any, List
-from openai import OpenAI
 
 from models import ShadowType, PromptAnswer, Evidence, PromptType
+from llm_client import LLMClient
 
 
 class Extractor:
     """Extracts prompt answers from transcript using LLM."""
     
-    def __init__(self, api_key: str = None):
-        """Initialize with OpenAI API key."""
-        self.client = OpenAI(api_key=api_key or os.getenv("OPENAI_API_KEY"))
+    def __init__(self, api_key: str = None, prefer_claude: bool = True):
+        """
+        Initialize with LLM client.
+        
+        Args:
+            api_key: Deprecated (uses env vars now)
+            prefer_claude: Use Claude Sonnet 4.5 primary, GPT-4o fallback
+        """
+        self.llm_client = LLMClient(prefer_claude=prefer_claude)
     
     def extract(
         self,
@@ -38,17 +44,15 @@ class Extractor:
         )
         
         try:
-            response = self.client.chat.completions.create(
-                model=os.getenv("OPENAI_MODEL", "gpt-4o-2024-08-06"),
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                response_format={"type": "json_object"},
-                temperature=0
+            # Use Claude with OpenAI fallback
+            response_text = self.llm_client.create_completion(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                temperature=0,
+                max_tokens=4000
             )
             
-            result = json.loads(response.choices[0].message.content)
+            result = json.loads(response_text)
             
             # Parse into PromptAnswer objects
             answers = {}
@@ -220,6 +224,163 @@ Qualifikationsfragen erkennen an Keywords:
 
 ❌ NUR bei KLARER Nicht-Erfüllung → checked: false
 ❌ NUR bei KOMPLETTEM Fehlen → checked: null
+
+═══════════════════════════════════════════════════════════════════
+MULTI-TURN REASONING FÜR QUALIFIKATIONEN (KRITISCH!)
+═══════════════════════════════════════════════════════════════════
+
+⚠️ WICHTIG: Qualifikationen werden oft ÜBER MEHRERE TURNS VERTEILT erwähnt!
+
+✅ KOMBINIERE Informationen aus verschiedenen Turns:
+┌────────────────────────────────────────────────────────────────┐
+│ Turn 1: "Ich habe 2019 meine Ausbildung fertig gemacht"       │
+│ Turn 3: "Als Pflegefachmann in der Charité"                   │
+│ Turn 7: "Dann war ich 3 Jahre auf der Intensivstation"        │
+│                                                                 │
+│ Frage: "Haben Sie eine Ausbildung als Pflegefachmann?"        │
+│                                                                 │
+│ → KOMBINIERE alle relevanten Turns!                            │
+│ → checked: true                                                 │
+│ → value: "ja (2019, Charité, 3 Jahre Intensivstation)"        │
+│ → confidence: 0.95                                              │
+│ → evidence: [                                                   │
+│     {span: "2019 meine Ausbildung", turn_index: 1, ...},       │
+│     {span: "Pflegefachmann in der Charité", turn_index: 3,...} │
+│   ] (MEHRERE Evidence-Einträge!)                               │
+└────────────────────────────────────────────────────────────────┘
+
+REGELN:
+1. ✅ Lies das GESAMTE Transkript für jede Qualifikationsfrage
+2. ✅ KOMBINIERE Informationen aus verschiedenen Turns
+3. ✅ Erstelle MEHRERE Evidence-Einträge wenn Info verteilt ist
+4. ✅ Nutze Kontext: "Dann" / "Danach" / "Dort" = Bezug zu vorherigem Turn
+5. ✅ Auch frühe Turns (0-5) beachten - oft wird CV zu Beginn erwähnt
+
+❌ NICHT: Jeden Turn isoliert betrachten
+❌ NICHT: Nur den ersten passenden Turn nutzen
+✅ IMMER: Alle relevanten Turns zu einer Gesamtaussage kombinieren
+
+═══════════════════════════════════════════════════════════════════
+SYNONYM-ERKENNUNG FÜR QUALIFIKATIONEN (ERWEITERT!)
+═══════════════════════════════════════════════════════════════════
+
+⚠️ WICHTIG: Akzeptiere ÄQUIVALENTE und VERWANDTE Qualifikationen!
+
+PFLEGEBEREICH - Alle äquivalent:
+- Pflegefachmann/-frau
+- Gesundheits- und Krankenpfleger/in
+- Krankenpfleger/in, Krankenschwester
+- Altenpfleger/in
+- Kinderkrankenpfleger/in
+- Pflegefachkraft (staatlich anerkannt)
+- Examinierte/r Krankenpfleger/in
+
+ELEKTROTECHNIK - Alle äquivalent:
+- Bachelor/Master Elektrotechnik
+- Dipl.-Ing. Elektrotechnik
+- Elektroingenieur/in
+- Elektrotechniker/in (mit Techniker-Abschluss)
+
+PÄDAGOGIK - Alle äquivalent:
+- Erzieher/in (staatlich anerkannt)
+- Sozialpädagoge/in
+- Kinderpädagoge/in
+- Pädagogische Fachkraft
+- Kindergärtner/in
+- Elementarpädagoge/in
+
+IT-BEREICH - Alle äquivalent:
+- Fachinformatiker (Systemintegration/Anwendungsentwicklung)
+- IT-Systemelektroniker
+- Informatiker/in
+- Software-Entwickler/in
+
+GASTRONOMIE - Verwandt/äquivalent:
+- Koch/Köchin
+- Restaurantfachmann/-frau (mit Küchenerfahrung!)
+- Hotelfachmann/-frau (mit Küchenerfahrung!)
+
+✅ REGEL: Wenn Kandidat verwandte Qualifikation nennt:
+   → checked: true
+   → value: "[Genannte Qualifikation]"
+   → confidence: 0.85-0.92
+   → notes: "Aequivalente/Verwandte Qualifikation im [Bereich]"
+
+═══════════════════════════════════════════════════════════════════
+NEGATIVE QUALIFIKATIONEN PRÄZISE ERKENNEN (NEU!)
+═══════════════════════════════════════════════════════════════════
+
+❌ checked: false → Bei expliziter ODER impliziter Verneinung:
+
+1. EXPLIZITE VERNEINUNG (confidence: 0.90-0.95):
+   - "Nein, das habe ich nicht"
+   - "Ich habe keine Ausbildung als..."
+   - "Das kann ich leider nicht"
+   - "Darin bin ich nicht ausgebildet"
+
+2. IMPLIZITE VERNEINUNG (confidence: 0.75-0.85):
+   - "Ich habe keine formale Ausbildung, aber..."
+     → checked: false (formal), aber prüfe "aber"-Teil!
+   
+   - "Das liegt mir nicht so"
+     → checked: false, confidence: 0.80
+   
+   - "Da bin ich noch unsicher / unerfahren"
+     → checked: false, confidence: 0.75
+   
+   - "Das müsste ich noch lernen"
+     → checked: false, confidence: 0.80
+
+3. VORSICHTIGE VERNEINUNG - PRÜFE KOMPENSATION (confidence: variabel):
+   - "Nicht direkt, aber ich habe 5 Jahre Erfahrung"
+     → Erfahrung kompensiert? → checked: true, confidence: 0.78
+   
+   - "So richtig nicht, aber ich mache das seit 3 Jahren"
+     → Praktische Erfahrung kompensiert → checked: true, confidence: 0.75
+   
+   - "Nicht offiziell, aber..."
+     → Prüfe ob informelle Qualifikation ausreicht!
+
+⚠️ WICHTIG: Bei "aber" → Prüfe ob das Folgende die fehlende formale Qualifikation kompensiert!
+
+═══════════════════════════════════════════════════════════════════
+CONFIDENCE-SCORE KALIBRIERUNG (PRÄZISE!)
+═══════════════════════════════════════════════════════════════════
+
+Nutze diese GENAUE Tabelle für Confidence-Scores:
+
+confidence: 0.95-1.0 (SEHR HOCH - Eindeutige Bestätigung):
+├─ Explizite Aussage mit Zertifikat/Abschluss/Jahr
+├─ "Ja, ich habe [Qualifikation] abgeschlossen in [Jahr]"
+├─ Nachweis-Nummer oder Institution genannt
+└─ Mehrfache Bestätigung im Transkript
+
+confidence: 0.85-0.94 (HOCH - Starke Indizien):
+├─ Aequivalente Qualifikation eindeutig benannt
+├─ Lange Berufserfahrung (>=5 Jahre) im exakten Bereich
+├─ Position eindeutig, die formale Qualifikation erfordert
+└─ Institution/Arbeitgeber nennt, die Qualifikation voraussetzt
+
+confidence: 0.75-0.84 (MITTEL-HOCH - Wahrscheinlich qualifiziert):
+├─ Verwandte Qualifikation mit Bezug
+├─ Berufserfahrung 2-4 Jahre im Bereich
+├─ Praktische Tätigkeit mit konkreten Details
+└─ Selbstständige Arbeit in dem Bereich
+
+confidence: 0.65-0.74 (MITTEL - Möglicherweise qualifiziert):
+├─ Beiläufige Erwähnung ohne Details
+├─ Kurze Erfahrung (1-2 Jahre)
+├─ Quereinsteiger mit Bezug
+└─ Selbstlernen mit Nachweis (Portfolio/Projekte)
+
+confidence: 0.50-0.64 (NIEDRIG - Unsicher, aber möglich):
+├─ Sehr vage Angaben
+├─ Indirekte Hinweise
+├─ Kombination mehrerer schwacher Signale
+└─ "Habe mich damit beschäftigt" ohne Nachweis
+
+⚠️ NIEMALS confidence < 0.50 bei checked: true!
+⚠️ Bei confidence < 0.65 → Immer ausführliche notes mit Begründung!
 
 
 ═══════════════════════════════════════════════════════════════════
