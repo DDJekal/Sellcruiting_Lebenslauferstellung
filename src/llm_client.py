@@ -120,6 +120,28 @@ class LLMClient:
             lines = lines[1:-1] if lines[-1].strip() == "```" else lines[1:]
             response_text = "\n".join(lines).strip()
         
+        # Claude sometimes adds explanation after JSON - extract only JSON
+        # Find the first { and last }
+        try:
+            start_idx = response_text.index("{")
+            # Find matching closing brace
+            brace_count = 0
+            end_idx = -1
+            for i in range(start_idx, len(response_text)):
+                if response_text[i] == "{":
+                    brace_count += 1
+                elif response_text[i] == "}":
+                    brace_count -= 1
+                    if brace_count == 0:
+                        end_idx = i + 1
+                        break
+            
+            if end_idx > start_idx:
+                response_text = response_text[start_idx:end_idx]
+        except ValueError:
+            # No { found, return as is
+            pass
+        
         return response_text
     
     def _call_openai(

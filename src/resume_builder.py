@@ -46,15 +46,24 @@ class ResumeBuilder:
         applicant_id = self._generate_id(elevenlabs_metadata)
         resume_id = applicant_id + 1000  # Simple offset
         
-        # Extract applicant data
+        # Extract applicant data (basic info from metadata + regex)
         applicant = self._extract_applicant_data(
             transcript, elevenlabs_metadata, applicant_id
         )
         
-        # Extract resume data with LLM
+        # Extract resume data with LLM (includes postal_code extraction)
         resume_data = self._extract_resume_data(
             transcript, temporal_context, applicant_id, resume_id
         )
+        
+        # Update applicant postal_code from LLM if available
+        # (LLM is more accurate than regex)
+        if resume_data.postal_code and not applicant.postal_code:
+            print(f"   [INFO] Uebertrage PLZ vom Resume zum Applicant: {resume_data.postal_code}")
+            applicant.postal_code = resume_data.postal_code
+        elif resume_data.postal_code and applicant.postal_code != resume_data.postal_code:
+            print(f"   [INFO] LLM-PLZ ({resume_data.postal_code}) ueberschreibt Regex-PLZ ({applicant.postal_code})")
+            applicant.postal_code = resume_data.postal_code
         
         return ApplicantResume(
             applicant=applicant,
@@ -187,8 +196,19 @@ class ResumeBuilder:
                     description=edu.get('description', '')
                 ))
             
+            # Extract postal_code and city from LLM
+            postal_code_llm = result.get('postal_code')
+            city_llm = result.get('city')
+            
+            if postal_code_llm:
+                print(f"   [INFO] PLZ aus LLM extrahiert: {postal_code_llm}")
+            if city_llm:
+                print(f"   [INFO] Stadt aus LLM extrahiert: {city_llm}")
+            
             return Resume(
                 id=resume_id,
+                postal_code=postal_code_llm,
+                city=city_llm,
                 preferred_contact_time=result.get('preferred_contact_time'),
                 preferred_workload=result.get('preferred_workload'),
                 willing_to_relocate=result.get('willing_to_relocate'),
@@ -218,6 +238,89 @@ class ResumeBuilder:
 
 AUFGABE:
 Extrahiere aus dem deutschen Transkript alle relevanten Lebenslaufdaten und gib sie als strukturiertes JSON zurück.
+
+═══════════════════════════════════════════════════════════════════
+PERSÖNLICHE DATEN - WOHNORT & POSTLEITZAHL (KRITISCH!)
+═══════════════════════════════════════════════════════════════════
+
+⚠️ POSTLEITZAHL (PLZ) EXTRAHIEREN - 5 STELLEN:
+
+✅ ERKENNUNGSMUSTER:
+┌────────────────────────────────────────────────────────────────┐
+│ "Ich wohne in Berlin, Postleitzahl 10115"                     │
+│ → postal_code: "10115", city: "Berlin"                        │
+│                                                                 │
+│ "In der 12345 Musterstraße wohne ich"                         │
+│ → postal_code: "12345", city: null                            │
+│                                                                 │
+│ "Ich bin aus München, PLZ 80331"                              │
+│ → postal_code: "80331", city: "München"                       │
+│                                                                 │
+│ "Ich wohne ganz in der Nähe, in 90402 Nürnberg"              │
+│ → postal_code: "90402", city: "Nürnberg"                      │
+│                                                                 │
+│ "Aus dem 49536 Lotte komme ich"                               │
+│ → postal_code: "49536", city: "Lotte"                         │
+│                                                                 │
+│ "Ich wohne in 10178 Berlin-Mitte"                             │
+│ → postal_code: "10178", city: "Berlin"                        │
+└────────────────────────────────────────────────────────────────┘
+
+✅ KONTEXT-KEYWORDS (helfen bei der Identifikation):
+- "wohne in", "wohne ganz in der Nähe"
+- "aus [Stadt]", "komme aus", "bin aus"
+- "PLZ", "Postleitzahl"
+- Stadtnamen (Berlin, München, Hamburg, etc.)
+- "in [PLZ] [Stadt]" oder "[Stadt] [PLZ]"
+
+✅ REGELN:
+1. PLZ ist IMMER 5 Ziffern (keine 4 oder 6!)
+2. PLZ steht meist VOR oder NACH dem Stadtnamen
+3. Bei mehreren 5-stelligen Zahlen: Nimm die mit Wohnort-Kontext
+4. Deutsche PLZ-Bereiche: 01xxx-99xxx
+5. Wenn unsicher: null (nicht raten!)
+
+❌ KEINE Postleitzahl (häufige Fehlerquellen):
+- Telefonnummern (länger als 5 Ziffern, oft mit +49)
+- Hausnummern (stehen NACH Straßenname, z.B. "Musterstraße 123")
+- Jahreszahlen (1900-2026, meist im Kontext "seit 2020")
+- Personalnummern oder IDs
+- Zahlen ohne Wohnort-Kontext
+
+⚠️ CITY EXTRAHIEREN:
+- Extrahiere den Stadtnamen/Ort wenn erwähnt
+- Format: "Berlin" (nicht "Berlin-Mitte" oder "in Berlin")
+- Auch kleine Städte/Gemeinden zählen (z.B. "Lotte", "Lengrich")
+- Bei Stadtteilen: Nur Hauptstadt (z.B. "Berlin-Kreuzberg" → "Berlin")
+
+BEISPIELE (KRITISCH - LERNE AUS DIESEN!):
+┌────────────────────────────────────────────────────────────────┐
+│ Transkript: "Ich bin 35 Jahre alt und wohne in 90402 Nürnberg"│
+│             ^^^^^^^^                           ^^^^^           │
+│             KEIN PLZ!                          PLZ! ✅          │
+│                                                                 │
+│ Output: postal_code: "90402", city: "Nürnberg"                │
+└────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────┐
+│ Transkript: "Musterstraße 12345 in Hamburg"                   │
+│                        ^^^^^                                    │
+│                        Hausnummer, KEIN PLZ! ❌                │
+│                                                                 │
+│ Transkript: "...und wohne in 20095 Hamburg"                   │
+│                              ^^^^^                              │
+│                              PLZ! ✅                            │
+│                                                                 │
+│ Output: postal_code: "20095", city: "Hamburg"                 │
+└────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────┐
+│ Transkript: "Seit 2019 arbeite ich hier, wohne in 10115"     │
+│            ^^^^^                                  ^^^^^        │
+│            Jahr, KEIN PLZ!                        PLZ! ✅      │
+│                                                                 │
+│ Output: postal_code: "10115", city: null                      │
+└────────────────────────────────────────────────────────────────┘
 
 ═══════════════════════════════════════════════════════════════════
 TEMPORALE REGELN (HÖCHSTE PRIORITÄT)
@@ -429,6 +532,8 @@ OUTPUT JSON SCHEMA
 ═══════════════════════════════════════════════════════════════════
 
 {
+  "postal_code": string|null (5-stellige PLZ, z.B. "10115", "90402" - NUR wenn im Transkript erwähnt!),
+  "city": string|null (Stadt/Ort, z.B. "Berlin", "München", "Lotte" - NUR wenn im Transkript erwähnt!),
   "preferred_contact_time": string|null,
   "preferred_workload": string|null (z.B. "Vollzeit (40h/Woche)" oder "Teilzeit (25h/Woche)" - bei Teilzeit IMMER mit Stundenzahl!),
   "willing_to_relocate": "ja"|"nein"|null,
