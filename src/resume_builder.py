@@ -486,6 +486,100 @@ EDUCATIONS - VOLLSTÄNDIGKEIT (KRITISCH)
    - "Uni" (ohne Name)
    - null (wenn Institution im Transkript genannt wurde!)
 
+4. DEUTSCHE ANERKENNUNG AUSLÄNDISCHER ABSCHLÜSSE (NEU - KRITISCH!):
+   
+   ⚠️ WENN AUSLÄNDISCHE AUSBILDUNG MIT DEUTSCHER ANERKENNUNG ERWÄHNT:
+   → Erstelle 2 SEPARATE Education-Einträge!
+   
+   ✅ ERKENNUNGSMUSTER (Keywords für Anerkennung):
+   - "deutsche Anerkennung", "anerkannt in Deutschland"
+   - "Gleichwertigkeitsbescheinigung", "Gleichwertigkeitsprüfung"
+   - "Anerkennung vom [Behörde]", "anerkannt durch [Behörde]"
+   - "Anerkennung beantragt", "Anerkennungsverfahren läuft"
+   - Behörden: Regierungspräsidium, IHK, Kultusministerium, ZAB, etc.
+   
+   ✅ RICHTIG - 2 Separate Einträge:
+   ┌────────────────────────────────────────────────────────────────┐
+   │ Transkript:                                                     │
+   │ "Ich habe 2018 in der Türkei meine Ausbildung als Pflege-     │
+   │  fachmann gemacht und 2023 die deutsche Anerkennung vom        │
+   │  Regierungspräsidium Stuttgart bekommen."                      │
+   │                                                                 │
+   │ Output - Education 1 (Originalabschluss):                      │
+   │ {                                                               │
+   │   "end": "2018-12-31",                                         │
+   │   "company": "Pflegeschule [Stadt], Türkei",                   │
+   │   "description": "Ausbildung Pflegefachmann"                   │
+   │ }                                                               │
+   │                                                                 │
+   │ Output - Education 2 (Deutsche Anerkennung):                   │
+   │ {                                                               │
+   │   "end": "2023-12-31",                                         │
+   │   "company": "Regierungspräsidium Stuttgart",                  │
+   │   "description": "Deutsche Anerkennung: Pflegefachmann (gleichwertig)"│
+   │ }                                                               │
+   └────────────────────────────────────────────────────────────────┘
+   
+   ✅ DESCRIPTION-FORMAT für Anerkennung:
+   - "Deutsche Anerkennung: [Originalabschluss] ([Status])"
+   - Status: "gleichwertig", "vollständig anerkannt", "teilweise anerkannt"
+   - Bei laufendem Verfahren: "Deutsche Anerkennung: [Abschluss] (beantragt)"
+   
+   ✅ COMPANY für Anerkennung:
+   - Name der anerkennenden Behörde/Institution
+   - Regierungspräsidium [Stadt] (z.B. "Regierungspräsidium Stuttgart")
+   - IHK [Stadt] (z.B. "IHK Nürnberg")
+   - Kultusministerium [Bundesland]
+   - ZAB (Zentralstelle für ausländisches Bildungswesen)
+   - Bei unklarer Behörde: "Anerkennungsstelle Deutschland"
+   
+   ✅ WEITERE BEISPIELE:
+   
+   Beispiel 1 - Ausbildung mit Anerkennung:
+   ┌────────────────────────────────────────────────────────────────┐
+   │ "Krankenpfleger hab ich in Polen gelernt, 2015 abgeschlossen. │
+   │  Die Anerkennung von der IHK Berlin hab ich 2020 bekommen."   │
+   │                                                                 │
+   │ → 2 Einträge:                                                   │
+   │   1. "Ausbildung Krankenpfleger" (Polen, 2015)                 │
+   │   2. "Deutsche Anerkennung: Krankenpfleger (anerkannt)" (IHK, 2020)│
+   └────────────────────────────────────────────────────────────────┘
+   
+   Beispiel 2 - Studium mit Anerkennung:
+   ┌────────────────────────────────────────────────────────────────┐
+   │ "Ich habe in Indien Elektrotechnik studiert, Bachelor 2019.   │
+   │  Vom Kultusministerium Bayern wurde das 2021 als gleichwertig │
+   │  mit dem deutschen Bachelor anerkannt."                        │
+   │                                                                 │
+   │ → 2 Einträge:                                                   │
+   │   1. "Bachelor Elektrotechnik" (Indien, 2019)                  │
+   │   2. "Deutsche Anerkennung: Bachelor Elektrotechnik (gleichwertig)"│
+   │      (Kultusministerium Bayern, 2021)                          │
+   └────────────────────────────────────────────────────────────────┘
+   
+   Beispiel 3 - Anerkennung beantragt (läuft noch):
+   ┌────────────────────────────────────────────────────────────────┐
+   │ "Mein Abschluss aus Syrien ist noch nicht anerkannt, aber ich │
+   │  habe es beantragt beim Regierungspräsidium."                 │
+   │                                                                 │
+   │ → 2 Einträge:                                                   │
+   │   1. "[Abschluss]" (Syrien, [Jahr])                            │
+   │   2. "Deutsche Anerkennung: [Abschluss] (beantragt)"           │
+   │      (Regierungspräsidium [Stadt], [Antragsjahr])              │
+   └────────────────────────────────────────────────────────────────┘
+   
+   ❌ FALSCH - nur 1 Eintrag mit Note:
+   {
+     "description": "Pflegefachmann (Türkei, anerkannt)"  ← ZU VAGE!
+   }
+   
+   ✅ WICHTIGE REGELN:
+   1. IMMER 2 separate Einträge bei erwähnter Anerkennung
+   2. Chronologisch korrekt (Original zuerst, dann Anerkennung)
+   3. Behördenname VOLLSTÄNDIG in company-Feld
+   4. Status in description-Klammern angeben
+   5. Auch bei "beantragt" oder "läuft noch" → 2 Einträge!
+
 ═══════════════════════════════════════════════════════════════════
 WEITERE FELDER
 ═══════════════════════════════════════════════════════════════════
@@ -517,15 +611,17 @@ Vor dem Senden überprüfen:
 4. ✅ JEDE Experience hat vollständigen Firmennamen in company? (KRITISCH!)
 5. ✅ Alle erwähnten Jobs erfasst?
 6. ✅ Alle erwähnten Bildungsstationen erfasst (inkl. Schule!)? (KRITISCH!)
-7. ✅ Wenn "current_job" → muss Experience mit end=null existieren
-8. ✅ Keine Halluzinationen? (nur Transkript-Fakten)
-9. ✅ Bei Teilzeit: Stundenzahl angegeben? (KRITISCH!)
+7. ✅ Ausländische Abschlüsse MIT deutscher Anerkennung → 2 separate Einträge? (NEU!)
+8. ✅ Wenn "current_job" → muss Experience mit end=null existieren
+9. ✅ Keine Halluzinationen? (nur Transkript-Fakten)
+10. ✅ Bei Teilzeit: Stundenzahl angegeben? (KRITISCH!)
 
 ⚠️ WARNUNG: 
 - Experiences mit tasks < 100 Zeichen werden ABGELEHNT!
 - Tasks mit "- " am Anfang werden ABGELEHNT (nutze Semikolon-Format)!
 - Experiences ohne position werden ABGELEHNT!
 - Vage Firmennamen ("eine Firma") werden ABGELEHNT!
+- Ausländische Abschlüsse MIT Anerkennung als 1 Eintrag werden ABGELEHNT (braucht 2!)!
 
 ═══════════════════════════════════════════════════════════════════
 OUTPUT JSON SCHEMA

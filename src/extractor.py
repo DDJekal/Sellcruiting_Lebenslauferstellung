@@ -196,9 +196,91 @@ Qualifikationsfragen erkennen an Keywords:
   │ → notes: "Beiläufig im Lebenslauf erwähnt"               │
   └──────────────────────────────────────────────────────────┘
 
+═══════════════════════════════════════════════════════════════════
+⚠️ AUSLÄNDISCHE ABSCHLÜSSE - DEUTSCHE ANERKENNUNG (KRITISCH!)
+═══════════════════════════════════════════════════════════════════
+
+⚠️ SPEZIALFALL: Ausländische Ausbildung/Studium
+
+PRÜFE IMMER ob deutsche Anerkennung erwähnt wird!
+
+✅ AUSLÄNDISCH MIT deutscher Anerkennung → checked: true:
+┌────────────────────────────────────────────────────────────────┐
+│ Frage: "Haben Sie eine Ausbildung als Pflegefachmann?"        │
+│ Kandidat: "Ja, in der Türkei gemacht und 2023 vom             │
+│            Regierungspräsidium in Deutschland anerkannt."      │
+│                                                                 │
+│ → checked: true ✅                                              │
+│ → value: "Pflegefachmann (Türkei, in Deutschland anerkannt)"  │
+│ → confidence: 0.95                                              │
+│ → notes: "Ausländische Ausbildung mit deutscher Anerkennung   │
+│          (Regierungspräsidium, 2023)"                          │
+└────────────────────────────────────────────────────────────────┘
+
+❌ AUSLÄNDISCH OHNE deutsche Anerkennung → checked: false:
+┌────────────────────────────────────────────────────────────────┐
+│ Frage: "Haben Sie eine Ausbildung als Pflegefachmann?"        │
+│ Kandidat: "Ja, in der Türkei habe ich das gelernt."           │
+│                                                                 │
+│ → checked: false ❌                                             │
+│ → value: "Pflegefachmann (Türkei, keine deutsche Anerkennung)"│
+│ → confidence: 0.90                                              │
+│ → notes: "Ausländische Ausbildung ohne deutsche Anerkennung - │
+│          nicht qualifiziert für reglementierte Berufe"         │
+└────────────────────────────────────────────────────────────────┘
+
+⚠️ AUSLÄNDISCH + Anerkennung BEANTRAGT → checked: false:
+┌────────────────────────────────────────────────────────────────┐
+│ Frage: "Haben Sie eine Ausbildung als Pflegefachmann?"        │
+│ Kandidat: "Ja, aus Syrien. Die Anerkennung habe ich           │
+│            beantragt, läuft noch."                             │
+│                                                                 │
+│ → checked: false ❌                                             │
+│ → value: "Pflegefachmann (Syrien, Anerkennung beantragt)"    │
+│ → confidence: 0.85                                              │
+│ → notes: "Ausländische Ausbildung, Anerkennung noch nicht     │
+│          abgeschlossen - aktuell nicht qualifiziert"           │
+└────────────────────────────────────────────────────────────────┘
+
+✅ KEYWORDS FÜR ANERKENNUNG:
+- "deutsche Anerkennung", "anerkannt in Deutschland"
+- "Gleichwertigkeitsbescheinigung", "gleichwertig"
+- "anerkannt vom [Behörde]", "Anerkennung durch [Behörde]"
+- Behörden: Regierungspräsidium, IHK, Kultusministerium, ZAB
+
+❌ KEYWORDS FÜR FEHLENDE ANERKENNUNG:
+- "noch nicht anerkannt", "keine Anerkennung"
+- "Anerkennung beantragt", "Anerkennungsverfahren läuft"
+- "wird noch geprüft", "habe ich noch nicht"
+
+⚠️ LÄNDER-ERKENNUNG (ausländische Ausbildung):
+- Türkei, Syrien, Polen, Rumänien, Bulgarien, Ukraine, etc.
+- "im Ausland", "nicht in Deutschland"
+- Bei unklarem Land: Frage "Wo haben Sie gelernt?" beachten
+
+✅ DEUTSCHE Ausbildung → checked: true (keine Anerkennung nötig!):
+┌────────────────────────────────────────────────────────────────┐
+│ Frage: "Haben Sie eine Ausbildung als Pflegefachmann?"        │
+│ Kandidat: "Ja, in Deutschland gemacht, in Nürnberg."          │
+│                                                                 │
+│ → checked: true ✅                                              │
+│ → value: "Pflegefachmann (Deutschland)"                       │
+│ → confidence: 0.95                                              │
+│ → notes: "Deutsche Ausbildung"                                 │
+└────────────────────────────────────────────────────────────────┘
+
+⚠️ KRITISCHE REGEL:
+Bei reglementierten Berufen (Pflege, Medizin, Lehramt, etc.) gilt:
+→ Ausländischer Abschluss OHNE deutsche Anerkennung = checked: false
+→ Nur MIT Anerkennung oder bei deutscher Ausbildung = checked: true
+
+═══════════════════════════════════════════════════════════════════
+
 ❌ checked: false → NUR bei EINDEUTIGER NICHT-ERFÜLLUNG:
   - Explizite Verneinung: "Nein, das habe ich nicht"
   - Komplett andere Branche ohne Bezug: "Ich bin IT-Spezialist" (bei Frage nach Pflege)
+  - Ausländische Ausbildung OHNE deutsche Anerkennung (siehe oben!)
+  - Anerkennung beantragt aber noch nicht erhalten (siehe oben!)
   - ⚠️ NICHT bei unklaren Antworten oder fehlenden Details!
 
 ⚠️ checked: null → NUR wenn GAR NICHTS im Transkript:
