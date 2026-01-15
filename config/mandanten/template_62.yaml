@@ -46,11 +46,5 @@ must_criteria:
   error_msg: 'Zwingendes Kriterium nicht erfüllt: Zwingend: staatlich anerkannter
     Abschluss in einem sozialpäd...'
 routing_rules: []
-implicit_defaults:
-- prompt_id: 289
-  reasoning: Gespräch wurde auf Deutsch geführt
-  default_answer:
-    checked: true
-    value: ja
-    confidence: 0.8
-    notes: Implizit angenommen (Gespräch auf Deutsch)
+implicit_defaults: []
+

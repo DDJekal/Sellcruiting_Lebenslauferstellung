@@ -175,8 +175,8 @@ def process_elevenlabs_call(webhook_data: Dict[str, Any]) -> Dict[str, Any]:
         confidence_threshold=0.85
     )
     
-    # Apply implicit defaults and routing
-    filled_protocol = validator.apply_implicit_defaults(filled_protocol, mandanten_config)
+    # Apply routing rules (implicit defaults REMOVED - no longer used)
+    # filled_protocol = validator.apply_implicit_defaults(filled_protocol, mandanten_config)
     filled_protocol = validator.apply_routing_rules(filled_protocol, mandanten_config)
     
     # Evaluate qualification (jetzt mit enriched protocol!)

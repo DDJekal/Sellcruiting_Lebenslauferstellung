@@ -65,12 +65,4 @@ qualification_groups:
 
 routing_rules: []
 
-implicit_defaults:
-  # Deutschkenntnisse implizit annehmen, wenn Gespräch auf Deutsch geführt wurde
-  - prompt_id: 3001
-    reasoning: "Gespräch wurde auf Deutsch geführt"
-    default_answer:
-      checked: true
-      value: "ja"
-      confidence: 0.8
-      notes: "Implizit angenommen (Gespräch auf Deutsch)"
+implicit_defaults: []

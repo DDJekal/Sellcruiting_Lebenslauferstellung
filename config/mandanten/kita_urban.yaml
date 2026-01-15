@@ -58,12 +58,5 @@ routing_rules:
       checked: true
       notes: "AUTO: Nur Erzieher:in ohne Leitungsqualifikation → weiterleiten"
 
-implicit_defaults:
-  - prompt_id: 289
-    reasoning: "Gespräch wurde auf Deutsch geführt"
-    default_answer:
-      checked: true
-      value: "ja"
-      confidence: 0.8
-      notes: "Implizit angenommen (Gespräch auf Deutsch)"
+implicit_defaults: []
 
