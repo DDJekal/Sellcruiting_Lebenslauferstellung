@@ -160,10 +160,64 @@ class ResumeBuilder:
             # Parse experiences with validation
             experiences = []
             for i, exp in enumerate(result.get('experiences', []), start=1):
-                # VALIDATION: Skip experiences without position
-                if not exp.get('position'):
-                    print(f"   [WARN] Experience {i} ohne position - ueberspringe")
-                    continue
+                # VALIDATION: Ensure position is present (CRITICAL!)
+                position = exp.get('position')
+                if not position:
+                    print(f"   [ERROR] Experience {i} OHNE 'position'-Feld - versuche Fallback-Extraktion")
+                    
+                    # Try to extract from employment_type, tasks, or company
+                    employment_type = exp.get('employment_type', '')
+                    tasks = exp.get('tasks', '')
+                    company = exp.get('company', 'Unbekannte Firma')
+                    
+                    # Fallback 1: Use employment_type if it contains a job description
+                    if employment_type and employment_type not in ['Hauptjob', 'Nebenjob', 'Praktikum']:
+                        if 'Werkstudent' in employment_type or 'Duales Studium' in employment_type:
+                            position = employment_type
+                            print(f"   [FALLBACK] Position aus employment_type: '{position}'")
+                        else:
+                            position = employment_type
+                            print(f"   [FALLBACK] Position aus employment_type: '{position}'")
+                    
+                    # Fallback 2: Try to extract profession from first part of tasks
+                    elif tasks and len(tasks) > 20:
+                        # Extract first meaningful part (before first semicolon or comma)
+                        first_part = tasks.split(';')[0].split(',')[0].strip()
+                        # Try to find job-related keywords
+                        if any(keyword in first_part.lower() for keyword in ['konstruktion', 'pflege', 'entwicklung', 'leitung', 'beratung', 'verwaltung']):
+                            position = f"Mitarbeiter {first_part[:40]}"
+                            print(f"   [FALLBACK] Position aus tasks generiert: '{position}'")
+                        else:
+                            position = f"Mitarbeiter bei {company}"
+                            print(f"   [FALLBACK] Generic position mit Firma: '{position}'")
+                    
+                    # Fallback 3: Generic position with company name
+                    else:
+                        position = f"Mitarbeiter bei {company}"
+                        print(f"   [FALLBACK] Generic fallback position: '{position}'")
+                    
+                    # Add fallback position to exp
+                    exp['position'] = position
+                    print(f"   [WARN] Experience {i} wurde mit Fallback-Position gerettet: '{position}'")
+                
+                # Validate that position is not vague
+                if position and any(vague in position.lower() for vague in ['arbeit in', 'tätig in', 'tätig als', 'im bereich']):
+                    print(f"   [WARN] Vage Position erkannt: '{position}' - versuche zu verbessern")
+                    # Try to extract the actual profession from the vague description
+                    # e.g., "Arbeit in der Konstruktion" -> "Konstrukteur"
+                    if 'konstruktion' in position.lower():
+                        position = 'Konstrukteur'
+                    elif 'pflege' in position.lower():
+                        position = 'Pflegekraft'
+                    elif 'entwicklung' in position.lower():
+                        position = 'Entwickler'
+                    elif 'vertrieb' in position.lower():
+                        position = 'Vertriebsmitarbeiter'
+                    else:
+                        # Keep as is but log warning
+                        print(f"   [WARN] Konnte vage Position nicht verbessern: '{position}'")
+                    
+                    exp['position'] = position
                 
                 # Clean vague company names
                 company = exp.get('company')
@@ -178,7 +232,7 @@ class ResumeBuilder:
                 
                 experiences.append(Experience(
                     id=i,
-                    position=exp.get('position'),
+                    position=position,  # Now guaranteed to exist
                     start=exp.get('start'),
                     end=exp.get('end'),
                     company=company,
@@ -243,7 +297,11 @@ Extrahiere aus dem deutschen Transkript alle relevanten Lebenslaufdaten und gib 
 PERSÖNLICHE DATEN - WOHNORT & POSTLEITZAHL (KRITISCH!)
 ═══════════════════════════════════════════════════════════════════
 
-⚠️ POSTLEITZAHL (PLZ) EXTRAHIEREN - 5 STELLEN:
+⚠️ POSTLEITZAHL (PLZ) EXTRAHIEREN - 5 STELLEN (HÖCHSTE PRIORITÄT!):
+
+🚨 KRITISCH: PLZ ist ein PFLICHTFELD! Durchsuche das GESAMTE Transkript gründlich!
+🚨 Lies JEDE Zeile sorgfältig - PLZ kann überall im Gespräch erwähnt werden!
+🚨 Bei Unsicherheit: Lies nochmal! PLZ ist oft versteckt in längeren Sätzen!
 
 ✅ ERKENNUNGSMUSTER:
 ┌────────────────────────────────────────────────────────────────┐
@@ -273,12 +331,14 @@ PERSÖNLICHE DATEN - WOHNORT & POSTLEITZAHL (KRITISCH!)
 - Stadtnamen (Berlin, München, Hamburg, etc.)
 - "in [PLZ] [Stadt]" oder "[Stadt] [PLZ]"
 
-✅ REGELN:
-1. PLZ ist IMMER 5 Ziffern (keine 4 oder 6!)
-2. PLZ steht meist VOR oder NACH dem Stadtnamen
-3. Bei mehreren 5-stelligen Zahlen: Nimm die mit Wohnort-Kontext
-4. Deutsche PLZ-Bereiche: 01xxx-99xxx
-5. Wenn unsicher: null (nicht raten!)
+✅ REGELN (STRENG BEFOLGEN!):
+1. 🚨 PLZ ist IMMER 5 Ziffern (keine 4 oder 6!)
+2. 🚨 PLZ steht meist VOR oder NACH dem Stadtnamen
+3. 🚨 Bei mehreren 5-stelligen Zahlen: Nimm die mit Wohnort-Kontext
+4. 🚨 Deutsche PLZ-Bereiche: 01xxx-99xxx (prüfe ob gültig!)
+5. 🚨 Durchsuche GESAMTES Transkript - PLZ kann am Anfang, Mitte oder Ende erwähnt werden!
+6. 🚨 Achte auf indirekte Erwähnungen: "da wo ich wohne, in der 12345", "bei mir in 67890"
+7. 🚨 NUR wenn wirklich keine PLZ im Transkript: null (aber erst nach GRÜNDLICHER Suche!)
 
 ❌ KEINE Postleitzahl (häufige Fehlerquellen):
 - Telefonnummern (länger als 5 Ziffern, oft mit +49)
@@ -387,18 +447,45 @@ EXPERIENCES - QUALITÄTS-ANFORDERUNGEN
    ❌ INAKZEPTABEL - Unter 100 Zeichen:
    "Entwicklung und Projektarbeit" (28 Zeichen)
 
-3. POSITION-FELD (KRITISCH - PFLICHTFELD):
-   ✅ Extrahiere die GENAUE Berufsbezeichnung:
-   - "Konstrukteur" (nicht "Arbeit in der Konstruktion")
-   - "Werkstudent Hardwarekonstruktion"
-   - "Projektleiter Elektrotechnik"
-   - "Pflegefachkraft"
-   - "Software-Entwickler"
+3. POSITION-FELD (KRITISCH - ABSOLUTES PFLICHTFELD!):
    
-   ❌ Keine vagen Beschreibungen wie:
-   - "Arbeit in der Konstruktion"
-   - "tätig in..."
-   - "im Bereich..."
+   🚨 KRITISCH: JEDE Experience MUSS eine konkrete Berufsbezeichnung im "position"-Feld haben!
+   🚨 NIEMALS eine Experience ohne "position" senden - das führt zu Datenverlust!
+   🚨 "position" ist das WICHTIGSTE Feld - es definiert WAS der Kandidat gemacht hat!
+   
+   ✅ GUTE Berufsbezeichnungen (konkret & präzise):
+   ┌────────────────────────────────────────────────────────────────┐
+   │ ✅ "Konstrukteur"                                              │
+   │ ✅ "Werkstudent Hardwarekonstruktion"                          │
+   │ ✅ "Projektleiter Elektrotechnik"                              │
+   │ ✅ "Pflegefachkraft Intensivstation"                           │
+   │ ✅ "Software-Entwickler Backend"                               │
+   │ ✅ "Gesundheits- und Krankenpfleger"                           │
+   │ ✅ "Ingenieur Automatisierungstechnik"                         │
+   │ ✅ "Teamleiter Vertrieb"                                       │
+   └────────────────────────────────────────────────────────────────┘
+   
+   ❌ SCHLECHTE Bezeichnungen (vage, zu allgemein):
+   ┌────────────────────────────────────────────────────────────────┐
+   │ ❌ "Arbeit in der Konstruktion" → ZU VAGE!                     │
+   │ ❌ "tätig in der Pflege" → ZU VAGE!                            │
+   │ ❌ "im Bereich IT" → ZU VAGE!                                  │
+   │ ❌ "Mitarbeiter" → ZU ALLGEMEIN!                               │
+   │ ❌ "Beschäftigt bei Firma X" → KEINE BERUFSBEZEICHNUNG!        │
+   └────────────────────────────────────────────────────────────────┘
+   
+   🎯 EXTRAKTIONSREGELN:
+   1. Höre auf die GENAUE Berufsbezeichnung die der Kandidat nennt
+   2. Format: "[Berufsbezeichnung] [optional: Spezialisierung]"
+   3. Bei Werkstudenten: "Werkstudent [Bereich]" (z.B. "Werkstudent IT")
+   4. Bei dualen Studenten: "Dual Student [Bereich]" (z.B. "Dual Student Elektrotechnik")
+   5. Bei Praktikanten: "Praktikant [Bereich]" (z.B. "Praktikant Marketing")
+   6. Wenn nur Bereich erwähnt: Leite sinnvolle Berufsbezeichnung ab
+      Beispiel: "in der Pflege gearbeitet" → "Pflegekraft" (nicht "Arbeit in der Pflege")
+   
+   ⚠️ FALLBACK (NUR wenn wirklich keine Berufsbezeichnung erkennbar):
+   - Nutze employment_type + Firma: "Mitarbeiter bei [Firma]"
+   - ABER: Das ist die LETZTE Option! Versuche immer, eine konkrete Berufsbezeichnung zu finden!
 
 4. COMPANY-FELD - VOLLSTÄNDIGER FIRMENNAME:
    ✅ Immer den VOLLSTÄNDIGEN Firmennamen extrahieren:
@@ -605,23 +692,36 @@ QUALITÄTSPRÜFUNG (SELBST-VALIDIERUNG)
 ═══════════════════════════════════════════════════════════════════
 
 Vor dem Senden überprüfen:
-1. ✅ Alle Daten temporal gültig? (start < end)
-2. ✅ JEDE Experience mit mind. 100 Zeichen in tasks? (KRITISCH!)
-3. ✅ JEDE Experience hat position-Feld ausgefüllt? (KRITISCH!)
+1. ✅ PLZ extrahiert? (HÖCHSTE PRIORITÄT - Transkript nochmal durchlesen!)
+2. ✅ JEDE Experience hat "position"-Feld mit konkreter Berufsbezeichnung? (KRITISCH!)
+3. ✅ JEDE Experience mit mind. 100 Zeichen in tasks? (KRITISCH!)
 4. ✅ JEDE Experience hat vollständigen Firmennamen in company? (KRITISCH!)
-5. ✅ Alle erwähnten Jobs erfasst?
-6. ✅ Alle erwähnten Bildungsstationen erfasst (inkl. Schule!)? (KRITISCH!)
-7. ✅ Ausländische Abschlüsse MIT deutscher Anerkennung → 2 separate Einträge? (NEU!)
-8. ✅ Wenn "current_job" → muss Experience mit end=null existieren
-9. ✅ Keine Halluzinationen? (nur Transkript-Fakten)
-10. ✅ Bei Teilzeit: Stundenzahl angegeben? (KRITISCH!)
+5. ✅ Alle Daten temporal gültig? (start < end)
+6. ✅ Alle erwähnten Jobs erfasst?
+7. ✅ Alle erwähnten Bildungsstationen erfasst (inkl. Schule!)? (KRITISCH!)
+8. ✅ Ausländische Abschlüsse MIT deutscher Anerkennung → 2 separate Einträge? (NEU!)
+9. ✅ Wenn "current_job" → muss Experience mit end=null existieren
+10. ✅ Keine Halluzinationen? (nur Transkript-Fakten)
+11. ✅ Bei Teilzeit: Stundenzahl angegeben? (KRITISCH!)
 
-⚠️ WARNUNG: 
-- Experiences mit tasks < 100 Zeichen werden ABGELEHNT!
-- Tasks mit "- " am Anfang werden ABGELEHNT (nutze Semikolon-Format)!
-- Experiences ohne position werden ABGELEHNT!
-- Vage Firmennamen ("eine Firma") werden ABGELEHNT!
-- Ausländische Abschlüsse MIT Anerkennung als 1 Eintrag werden ABGELEHNT (braucht 2!)!
+🚨 DOPPELT PRÜFEN (BEVOR DU ANTWORTEST):
+   - Ist "postal_code" ausgefüllt? (Wenn ja → GUT! Wenn nein → NOCHMAL SUCHEN!)
+   - Hat JEDE Experience ein "position"-Feld? (Zähle nach: experiences.length == positions.length?)
+   - Sind alle "position"-Werte konkrete Berufsbezeichnungen? (Keine "Arbeit in..." oder "tätig als..."!)
+
+🚨 ABLEHNUNGSGRÜNDE (DIESE FEHLER FÜHREN ZU DATENVERLUST!):
+- ❌ Experiences OHNE "position"-Feld werden KOMPLETT GELÖSCHT! (KRITISCH!)
+- ❌ Experiences mit vager "position" (z.B. "Arbeit in...") werden ABGELEHNT!
+- ❌ Experiences mit tasks < 100 Zeichen werden ABGELEHNT!
+- ❌ Tasks mit "- " am Anfang werden ABGELEHNT (nutze Semikolon-Format)!
+- ❌ Vage Firmennamen ("eine Firma") werden ABGELEHNT!
+- ❌ Ausländische Abschlüsse MIT Anerkennung als 1 Eintrag werden ABGELEHNT (braucht 2!)!
+- ⚠️ Fehlende PLZ führt zu unvollständigem Bewerberprofil!
+
+💡 QUALITÄTSZIEL:
+   - 100% der Experiences haben konkrete "position"
+   - 100% der Tasks haben mind. 100 Zeichen
+   - PLZ ist extrahiert (wenn im Transkript erwähnt)
 
 ═══════════════════════════════════════════════════════════════════
 OUTPUT JSON SCHEMA
@@ -640,7 +740,7 @@ OUTPUT JSON SCHEMA
   "start": "YYYY-MM-DD"|null,
   "experiences": [
     {
-      "position": string (PFLICHT - Berufsbezeichnung, z.B. "Konstrukteur", "Werkstudent Hardwarekonstruktion"),
+      "position": string (🚨 ABSOLUTES PFLICHTFELD! Konkrete Berufsbezeichnung, z.B. "Konstrukteur", "Werkstudent Hardwarekonstruktion", "Pflegefachkraft"),
       "start": "YYYY-MM-DD"|null,
       "end": "YYYY-MM-DD"|null,
       "company": string (PFLICHT - vollständiger Firmenname, z.B. "Windmüller und Hölscher GmbH, Lengrich"),
@@ -657,19 +757,24 @@ OUTPUT JSON SCHEMA
   ]
 }
 
-KRITISCHE REGELN:
+KRITISCHE REGELN (AUSNAHMSLOS BEFOLGEN!):
 ❌ KEINE Erfindungen - nur Transkript-Fakten
 ❌ KEINE "- " am Anfang von tasks (nutze Semikolon-Format)
 ❌ KEINE vagen tasks-Beschreibungen (<100 Zeichen)
 ❌ KEINE vagen Firmennamen ("eine Firma", "ein Unternehmen")
 ❌ KEINE fehlenden Schulen/Unis wenn im Transkript erwähnt
 ❌ KEINE fehlenden Stundenzahlen bei Teilzeit
-❌ KEINE fehlenden position-Felder
-✅ Bei Unsicherheit bei company/position: null verwenden (aber nur wenn wirklich unklar!)
+🚨 NIEMALS Experience OHNE "position"-Feld senden - das ist DATENVERLUST!
+🚨 NIEMALS vage "position" wie "Arbeit in..." - das wird ABGELEHNT!
+🚨 PLZ MUSS gesucht werden - lies GESAMTES Transkript durch!
+
+✅ Bei Unsicherheit bei company: null verwenden (aber nur wenn wirklich unklar!)
+✅ Bei Unsicherheit bei position: Leite aus Kontext ab (z.B. "Pflegekraft" statt "in der Pflege")
 ✅ Temporale Annotationen [≈Jahr] nutzen
 ✅ JEDE Experience detailliert beschreiben mit erkennbarem Schwerpunkt
-✅ Position IMMER als konkrete Berufsbezeichnung
+✅ Position IMMER als konkrete Berufsbezeichnung (niemals "Arbeit in...", "tätig als...")
 ✅ Hauptjob vs Nebenjob durch employment_type unterscheiden
+✅ PLZ gründlich suchen - am Anfang, Mitte UND Ende des Transkripts!
 """
     
     def _build_transcript_context(
