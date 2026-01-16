@@ -254,8 +254,40 @@ class ResumeBuilder:
             postal_code_llm = result.get('postal_code')
             city_llm = result.get('city')
             
-            if postal_code_llm:
+            # FALLBACK: If LLM didn't find PLZ, try regex as backup
+            if not postal_code_llm:
+                print(f"   [WARN] LLM fand keine PLZ - versuche Regex-Fallback")
+                full_text = ' '.join(turn.get('text', '') for turn in transcript)
+                
+                # Find all 5-digit numbers
+                import re
+                plz_matches = re.findall(r'\b(\d{5})\b', full_text)
+                
+                # Filter for PLZ context (near keywords like "postleitzahl", "plz", "wohne")
+                plz_keywords = ['postleitzahl', 'plz', 'wohne', 'wohnort', 'gezogen', 'umgezogen']
+                
+                # Try to find PLZ near context keywords
+                for match in plz_matches:
+                    # Find context around this match
+                    match_pos = full_text.find(match)
+                    if match_pos > 0:
+                        context_before = full_text[max(0, match_pos-100):match_pos].lower()
+                        context_after = full_text[match_pos:min(len(full_text), match_pos+100)].lower()
+                        context = context_before + context_after
+                        
+                        # Check if any PLZ keyword is in context
+                        if any(keyword in context for keyword in plz_keywords):
+                            postal_code_llm = match
+                            print(f"   [FALLBACK] PLZ aus Regex extrahiert: {postal_code_llm}")
+                            break
+                
+                # If still not found, take first 5-digit number (risky but better than nothing)
+                if not postal_code_llm and plz_matches:
+                    postal_code_llm = plz_matches[0]
+                    print(f"   [FALLBACK] PLZ aus erster 5-stelliger Zahl: {postal_code_llm}")
+            else:
                 print(f"   [INFO] PLZ aus LLM extrahiert: {postal_code_llm}")
+            
             if city_llm:
                 print(f"   [INFO] Stadt aus LLM extrahiert: {city_llm}")
             
