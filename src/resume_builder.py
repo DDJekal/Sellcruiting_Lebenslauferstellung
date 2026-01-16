@@ -301,15 +301,34 @@ PERSÖNLICHE DATEN - WOHNORT & POSTLEITZAHL (KRITISCH!)
 
 🚨 KRITISCH: PLZ ist ein PFLICHTFELD! Durchsuche das GESAMTE Transkript gründlich!
 🚨 Lies JEDE Zeile sorgfältig - PLZ kann überall im Gespräch erwähnt werden!
+🚨 BESONDERS WICHTIG: PLZ wird oft AM ENDE des Gesprächs gefragt!
+🚨 Überfliege NICHT die letzten 5-10 Zeilen - dort steht oft die PLZ!
 🚨 Bei Unsicherheit: Lies nochmal! PLZ ist oft versteckt in längeren Sätzen!
 
 ✅ ERKENNUNGSMUSTER:
 ┌────────────────────────────────────────────────────────────────┐
+│ ANFANG DES GESPRÄCHS:                                          │
 │ "Ich wohne in Berlin, Postleitzahl 10115"                     │
 │ → postal_code: "10115", city: "Berlin"                        │
 │                                                                 │
+│ MITTE DES GESPRÄCHS:                                           │
 │ "In der 12345 Musterstraße wohne ich"                         │
 │ → postal_code: "12345", city: null                            │
+│                                                                 │
+│ ENDE DES GESPRÄCHS (HÄUFIG!):                                 │
+│ Recruiter: "Wo wohnen Sie denn?"                              │
+│ Kandidat: "In 90402 Nürnberg"                                 │
+│ → postal_code: "90402", city: "Nürnberg"                      │
+│                                                                 │
+│ ENDE DES GESPRÄCHS (HÄUFIG!):                                 │
+│ Recruiter: "Können Sie mir noch Ihre PLZ nennen?"             │
+│ Kandidat: "Ja klar, 49536"                                    │
+│ → postal_code: "49536", city: null                            │
+│                                                                 │
+│ ENDE DES GESPRÄCHS (HÄUFIG!):                                 │
+│ Recruiter: "In welcher Stadt wohnen Sie?"                     │
+│ Kandidat: "In Lotte, das ist 49536"                           │
+│ → postal_code: "49536", city: "Lotte"                         │
 │                                                                 │
 │ "Ich bin aus München, PLZ 80331"                              │
 │ → postal_code: "80331", city: "München"                       │
@@ -799,6 +818,9 @@ KRITISCHE REGELN (AUSNAHMSLOS BEFOLGEN!):
             speaker_label = "Kandidat" if turn['speaker'] == 'A' else "Recruiter"
             context += f"[{i}] {speaker_label}: {turn['text']}\n"
         
+        context += f"\n\n🚨 WICHTIG: Das Transkript hat {len(transcript)} Zeilen."
+        context += "\n🚨 PLZ wird oft AM ENDE des Gesprächs erwähnt - lies ALLE Zeilen gründlich!"
+        context += "\n🚨 Überfliege nicht das Ende - dort stehen oft wichtige Infos (PLZ, Startdatum, etc.)!"
         context += "\n\nExtrahiere nun die strukturierten Lebenslaufdaten als JSON:"
         
         return context
