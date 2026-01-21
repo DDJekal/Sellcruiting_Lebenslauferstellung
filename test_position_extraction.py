@@ -149,6 +149,7 @@ def test_position_quality():
     
     print(f"\n🔍 Qualitätsprüfung für {len(all_experiences)} Experiences:")
     
+    # Check 1: Vage Positionen
     vague_positions = []
     for exp in all_experiences:
         if exp.position:
@@ -166,11 +167,38 @@ def test_position_quality():
     else:
         print(f"\n✅ Alle Positionen sind konkret und präzise!")
     
+    # Check 2: Standort in company-Feld (Komma-Format)
+    print(f"\n🔍 Standort-Prüfung (Komma-Format):")
+    companies_with_location = []
+    companies_without_comma = []
+    companies_unknown = []
+    
+    for exp in all_experiences:
+        if exp.company:
+            if ',' in exp.company:
+                companies_with_location.append(exp.company)
+                print(f"   ✅ Company mit Standort (Komma-Format): {exp.company}")
+            else:
+                # Prüfe ob letztes Wort eine Stadt sein könnte (heuristisch)
+                parts = exp.company.split()
+                if len(parts) > 1 and parts[-1][0].isupper():
+                    companies_without_comma.append(exp.company)
+                    print(f"   ⚠️ Company ohne Komma: {exp.company} (sollte Komma haben?)")
+                else:
+                    companies_unknown.append(exp.company)
+                    print(f"   ℹ️ Company ohne erkennbaren Standort: {exp.company}")
+    
     print("\n" + "="*70)
     print(f"ZUSAMMENFASSUNG:")
     print(f"  Total Experiences: {len(all_experiences)}")
-    print(f"  Vage Positionen: {len(vague_positions)}")
-    print(f"  Qualität: {100 - (len(vague_positions) / len(all_experiences) * 100):.1f}%")
+    print(f"  Position-Qualität:")
+    print(f"    - Vage Positionen: {len(vague_positions)}")
+    print(f"    - Position-Qualität: {100 - (len(vague_positions) / len(all_experiences) * 100):.1f}%")
+    print(f"  Standort-Qualität:")
+    print(f"    - Mit Komma-Format: {len(companies_with_location)}")
+    print(f"    - Ohne Komma (potenziell falsch): {len(companies_without_comma)}")
+    print(f"    - Ohne Standort: {len(companies_unknown)}")
+    print(f"    - Standort-Qualität: {(len(companies_with_location) / len(all_experiences) * 100):.1f}%")
     print("="*70)
     
     # Write results to file for inspection

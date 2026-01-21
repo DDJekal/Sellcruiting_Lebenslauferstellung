@@ -626,18 +626,61 @@ EXPERIENCES - QUALITÄTS-ANFORDERUNGEN
    - Nutze employment_type + Firma: "Mitarbeiter bei [Firma]"
    - ABER: Das ist die LETZTE Option! Versuche immer, eine konkrete Berufsbezeichnung zu finden!
 
-4. COMPANY-FELD - VOLLSTÄNDIGER FIRMENNAME:
-   ✅ Immer den VOLLSTÄNDIGEN Firmennamen extrahieren:
-   - "Windmüller und Hölscher GmbH, Lengrich"
-   - "Siemens AG"
-   - "Klinikum der Stadt Köln"
+4. COMPANY-FELD - VOLLSTÄNDIGER FIRMENNAME MIT STANDORT:
    
-   ❌ NICHT AKZEPTABEL:
-   - "eine Firma"
-   - "ein Unternehmen"
-   - "Firma XY"
+   🚨 WICHTIG: Bei großen Einrichtungen/Ketten IMMER Standort hinzufügen!
+   🚨 FORMAT: "[Einrichtung], [Stadt/Stadtteil]" - KOMMA ist PFLICHT!
    
-   ⚠️ Bei unklarem Namen: null (nicht raten!)
+   ✅ RICHTIG - Mit Komma-Trennung:
+   ┌────────────────────────────────────────────────────────────────┐
+   │ ✅ "Caritas, Stuttgart"                                        │
+   │ ✅ "Caritas Pflegezentrum St. Martin, Stuttgart"               │
+   │ ✅ "Urban Kita Springmäuse, Berlin-Hellersdorf"                │
+   │ ✅ "Klinikum, Stuttgart"                                       │
+   │ ✅ "Windmüller und Hölscher GmbH, Lengrich"                    │
+   │ ✅ "DRK Kreisverband, München"                                 │
+   │ ✅ "AWO Sozialstation, Berlin-Mitte"                           │
+   │ ✅ "Charité Campus Mitte, Berlin"                              │
+   │ ✅ "Siemens AG, München"                                       │
+   └────────────────────────────────────────────────────────────────┘
+   
+   ❌ FALSCH - Ohne Komma oder mit falscher Trennung:
+   ┌────────────────────────────────────────────────────────────────┐
+   │ ❌ "Caritas" → FEHLT: Standort komplett!                      │
+   │ ❌ "Caritas Stuttgart" → FEHLT: Komma!                        │
+   │ ❌ "Urban Kita in Berlin" → FALSCH: "in" statt Komma!         │
+   │ ❌ "DRK München" → FEHLT: Komma!                              │
+   │ ❌ "eine Firma" → VAGE: Kein Name!                            │
+   │ ❌ "ein Unternehmen" → VAGE: Kein Name!                       │
+   └────────────────────────────────────────────────────────────────┘
+   
+   🎯 EXTRAKTIONSREGELN:
+   
+   Der Agent fragt im Gespräch NACH DEM STANDORT:
+   - "An welchem Standort waren Sie bei [Firma]?"
+   - "In welcher Stadt war das?"
+   - "Welche Einrichtung genau?"
+   - "Wo genau haben Sie da gearbeitet?"
+   - "Welcher Kreisverband/Welche Filiale?"
+   
+   ⚠️ MULTI-TURN EXTRAKTION (KRITISCH!):
+   Oft wird der Standort in einem SPÄTEREN Turn genannt:
+   
+   Turn 1: "Wo waren Sie dort?"
+   Turn 2: "Bei der Caritas"
+   Turn 3: "An welchem Standort?"
+   Turn 4: "In Stuttgart"
+   
+   → KOMBINIERE zu: "Caritas, Stuttgart" (MIT KOMMA!)
+   
+   📍 WANN STANDORT HINZUFÜGEN:
+   - Bei Trägern/Ketten: IMMER (Caritas, DRK, AWO, etc.)
+   - Bei Kitas/Schulen: IMMER (Urban Kita, Kita xyz, etc.)
+   - Bei Kliniken: IMMER (Klinikum, Charité, etc.)
+   - Bei Firmen mit mehreren Standorten: WENN ERWÄHNT
+   - Bei kleinen lokalen Firmen: WENN ERWÄHNT
+   
+   ⚠️ Bei unklarem Namen oder Standort: null (nicht raten!)
 
 5. EMPLOYMENT_TYPE-FELD (NEU - WICHTIG):
    Unterscheide klar zwischen verschiedenen Beschäftigungsarten:
@@ -654,6 +697,8 @@ EXPERIENCES - QUALITÄTS-ANFORDERUNGEN
    - So ist erkennbar, was parallel lief
 
 6. BEISPIEL VOLLSTÄNDIGE EXPERIENCE:
+
+Beispiel 1 - Mittelständische Firma mit Standort:
 {
   "position": "Werkstudent Hardwarekonstruktion",
   "start": "2021-08-01",
@@ -661,6 +706,36 @@ EXPERIENCES - QUALITÄTS-ANFORDERUNGEN
   "company": "Windmüller und Hölscher GmbH, Lengrich",
   "employment_type": "Duales Studium",
   "tasks": "Hardwarekonstruktion für Kundenanlagen (Schwerpunkt: Automatisierungstechnik); Integration von Kundenwünschen in bestehende Anlagendesigns; Kundenaustausch und technische Beratung; Prozessoptimierung zur Automatisierung von Betriebsabläufen; Sonderaufgaben im Bereich Digitalisierung"
+}
+
+Beispiel 2 - Großer Träger mit Standort:
+{
+  "position": "Pflegefachkraft",
+  "start": "2020-01-01",
+  "end": "2023-12-31",
+  "company": "Caritas Pflegezentrum St. Martin, Stuttgart",
+  "employment_type": "Hauptjob",
+  "tasks": "Patientenbetreuung in der Altenpflege; Medikamentenvergabe und Wundversorgung; Pflegedokumentation und Qualitätssicherung; Angehörigenberatung und Kommunikation; Zusammenarbeit im interdisziplinären Team; Einhaltung von Hygiene- und Sicherheitsstandards"
+}
+
+Beispiel 3 - Kita mit spezifischem Namen und Stadtteil:
+{
+  "position": "Erzieherin",
+  "start": "2022-04-01",
+  "end": "2022-10-31",
+  "company": "Urban Kita Springmäuse, Berlin-Hellersdorf",
+  "employment_type": "Hauptjob",
+  "tasks": "Pädagogische Betreuung von Kindern in einem elterngetragenen Kinderladen (bis 25 Kinder); Gruppenarbeit und individuelle Förderung; Zusammenarbeit mit den Eltern als Träger; Umsetzung pädagogischer Konzepte; Dokumentation der Entwicklungsfortschritte; Gestaltung des Kita-Alltags und Aktivitäten"
+}
+
+Beispiel 4 - Klinikum mit Campus:
+{
+  "position": "Gesundheits- und Krankenpfleger",
+  "start": "2019-06-01",
+  "end": null,
+  "company": "Charité Campus Virchow, Berlin",
+  "employment_type": "Hauptjob",
+  "tasks": "Patientenversorgung auf der Intensivstation; Überwachung von Vitalparametern und medizinischen Geräten; Vorbereitung und Nachsorge bei Operationen; Medikamentenvergabe nach ärztlicher Anordnung; Pflegedokumentation im elektronischen System; Angehörigengespräche und psychosoziale Betreuung"
 }
 
 ═══════════════════════════════════════════════════════════════════
@@ -886,7 +961,15 @@ OUTPUT JSON SCHEMA
                           NIEMALS vage wie "Arbeit in..." oder "tätig als..."!),
       "start": "YYYY-MM-DD"|null,
       "end": "YYYY-MM-DD"|null,
-      "company": string (PFLICHT - vollständiger Firmenname, z.B. "Windmüller und Hölscher GmbH, Lengrich"),
+      "company": string (PFLICHT - Firmenname MIT Standort!
+                        FORMAT: "[Einrichtung], [Stadt/Stadtteil]"
+                        Komma-Trennung ist PFLICHT bei Standort-Angabe!
+                        Beispiele: 
+                        - "Caritas, Stuttgart"
+                        - "Urban Kita Springmäuse, Berlin-Hellersdorf"
+                        - "Windmüller und Hölscher GmbH, Lengrich"
+                        - "Charité Campus Mitte, Berlin"
+                        Bei großen Einrichtungen/Ketten: IMMER Standort mit Komma angeben!),
       "employment_type": string (z.B. "Hauptjob", "Nebenjob", "Werkstudent", "Duales Studium", "Praktikum"),
       "tasks": string (Fließtext mit Semikolon-Trennung, KEIN "- " am Anfang!, MINIMUM 100 Zeichen, Schwerpunkt erkennbar!)
     }
