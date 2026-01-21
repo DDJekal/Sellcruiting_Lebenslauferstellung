@@ -163,61 +163,41 @@ class ResumeBuilder:
                 # VALIDATION: Ensure position is present (CRITICAL!)
                 position = exp.get('position')
                 if not position:
-                    print(f"   [ERROR] Experience {i} OHNE 'position'-Feld - versuche Fallback-Extraktion")
+                    print(f"   [ERROR] Experience {i} OHNE 'position'-Feld - KRITISCHER FEHLER!")
                     
-                    # Try to extract from employment_type, tasks, or company
+                    # Try intelligent fallback: extract from employment_type or tasks
                     employment_type = exp.get('employment_type', '')
                     tasks = exp.get('tasks', '')
-                    company = exp.get('company', 'Unbekannte Firma')
                     
-                    # Fallback 1: Use employment_type if it contains a job description
+                    # Fallback 1: Use employment_type if it's descriptive
                     if employment_type and employment_type not in ['Hauptjob', 'Nebenjob', 'Praktikum']:
-                        if 'Werkstudent' in employment_type or 'Duales Studium' in employment_type:
-                            position = employment_type
-                            print(f"   [FALLBACK] Position aus employment_type: '{position}'")
-                        else:
-                            position = employment_type
-                            print(f"   [FALLBACK] Position aus employment_type: '{position}'")
+                        position = employment_type
+                        print(f"   [FALLBACK] Position aus employment_type: '{position}'")
                     
-                    # Fallback 2: Try to extract profession from first part of tasks
-                    elif tasks and len(tasks) > 20:
-                        # Extract first meaningful part (before first semicolon or comma)
-                        first_part = tasks.split(';')[0].split(',')[0].strip()
-                        # Try to find job-related keywords
-                        if any(keyword in first_part.lower() for keyword in ['konstruktion', 'pflege', 'entwicklung', 'leitung', 'beratung', 'verwaltung']):
-                            position = f"Mitarbeiter {first_part[:40]}"
-                            print(f"   [FALLBACK] Position aus tasks generiert: '{position}'")
+                    # Fallback 2: Try to extract from tasks using keyword mapping
+                    elif tasks:
+                        position = self._extract_position_from_keywords(tasks)
+                        if position:
+                            print(f"   [FALLBACK] Position aus tasks extrahiert: '{position}'")
                         else:
-                            position = f"Mitarbeiter bei {company}"
-                            print(f"   [FALLBACK] Generic position mit Firma: '{position}'")
-                    
-                    # Fallback 3: Generic position with company name
+                            print(f"   [FALLBACK FAILED] Keine Position extrahierbar - Experience wird übersprungen!")
+                            continue  # Skip this experience
                     else:
-                        position = f"Mitarbeiter bei {company}"
-                        print(f"   [FALLBACK] Generic fallback position: '{position}'")
+                        print(f"   [FALLBACK FAILED] Experience ohne position wird übersprungen!")
+                        continue  # Skip this experience
                     
-                    # Add fallback position to exp
                     exp['position'] = position
-                    print(f"   [WARN] Experience {i} wurde mit Fallback-Position gerettet: '{position}'")
                 
-                # Validate that position is not vague
+                # Validate that position is not vague and improve if possible
                 if position and any(vague in position.lower() for vague in ['arbeit in', 'tätig in', 'tätig als', 'im bereich']):
                     print(f"   [WARN] Vage Position erkannt: '{position}' - versuche zu verbessern")
-                    # Try to extract the actual profession from the vague description
-                    # e.g., "Arbeit in der Konstruktion" -> "Konstrukteur"
-                    if 'konstruktion' in position.lower():
-                        position = 'Konstrukteur'
-                    elif 'pflege' in position.lower():
-                        position = 'Pflegekraft'
-                    elif 'entwicklung' in position.lower():
-                        position = 'Entwickler'
-                    elif 'vertrieb' in position.lower():
-                        position = 'Vertriebsmitarbeiter'
+                    improved = self._extract_position_from_keywords(position)
+                    if improved:
+                        position = improved
+                        exp['position'] = position
+                        print(f"   [FIX] Position verbessert zu: '{position}'")
                     else:
-                        # Keep as is but log warning
                         print(f"   [WARN] Konnte vage Position nicht verbessern: '{position}'")
-                    
-                    exp['position'] = position
                 
                 # Clean vague company names
                 company = exp.get('company')
@@ -318,12 +298,120 @@ class ResumeBuilder:
                 educations=[]
             )
     
+    def _extract_position_from_keywords(self, text: str) -> str:
+        """
+        Extract job position from text using keyword mapping.
+        
+        Args:
+            text: Text containing job-related keywords
+            
+        Returns:
+            Extracted position or None if no match found
+        """
+        POSITION_KEYWORDS = {
+            'konstruktion': 'Konstrukteur',
+            'konstrukteur': 'Konstrukteur',
+            'hardwarekonstruktion': 'Hardwarekonstrukteur',
+            'pflege': 'Pflegefachkraft',
+            'krankenpflege': 'Gesundheits- und Krankenpfleger',
+            'altenpflege': 'Altenpfleger',
+            'kinderpflege': 'Kinderpfleger',
+            'intensivpflege': 'Pflegefachkraft Intensivstation',
+            'kita-leitung': 'Kita-Leitung',
+            'kita leitung': 'Kita-Leitung',
+            'kitaleitung': 'Kita-Leitung',
+            'stellvertretende kita-leitung': 'Stellvertretende Kita-Leitung',
+            'erzieher': 'Erzieher',
+            'erzieherin': 'Erzieherin',
+            'entwicklung': 'Entwickler',
+            'softwareentwicklung': 'Software-Entwickler',
+            'webentwicklung': 'Web-Entwickler',
+            'vertrieb': 'Vertriebsmitarbeiter',
+            'verkauf': 'Verkäufer',
+            'buchhaltung': 'Buchhalter',
+            'verwaltung': 'Verwaltungsmitarbeiter',
+            'sekretariat': 'Sekretär',
+            'assistenz': 'Assistent',
+            'projektleitung': 'Projektleiter',
+            'teamleitung': 'Teamleiter',
+            'abteilungsleitung': 'Abteilungsleiter',
+            'geschäftsführung': 'Geschäftsführer',
+            'pädagogik': 'Pädagogische Fachkraft',
+            'sozialpädagogik': 'Sozialpädagoge',
+            'gastronomie': 'Gastronomiefachkraft',
+            'küche': 'Koch',
+            'service': 'Servicekraft',
+            'lager': 'Lagermitarbeiter',
+            'logistik': 'Logistiker',
+            'elektrotechnik': 'Elektrotechniker',
+            'maschinenbau': 'Maschinenbauingenieur',
+            'it': 'IT-Fachkraft',
+        }
+        
+        text_lower = text.lower()
+        
+        # Check for matches (longest first to catch "hardwarekonstruktion" before "konstruktion")
+        for keyword in sorted(POSITION_KEYWORDS.keys(), key=len, reverse=True):
+            if keyword in text_lower:
+                return POSITION_KEYWORDS[keyword]
+        
+        return None
+    
     def _build_resume_extraction_prompt(self) -> str:
         """Build system prompt for resume extraction."""
         return """Du bist ein Experte für die Extraktion von strukturierten Lebenslaufdaten aus Bewerbungsgesprächen.
 
 AUFGABE:
 Extrahiere aus dem deutschen Transkript alle relevanten Lebenslaufdaten und gib sie als strukturiertes JSON zurück.
+
+═══════════════════════════════════════════════════════════════════
+BERUFSBEZEICHNUNG EXTRAHIEREN (HÖCHSTE PRIORITÄT!)
+═══════════════════════════════════════════════════════════════════
+
+🚨 KRITISCH: Für JEDE berufliche Station MUSS das "position"-Feld mit der KONKRETEN Berufsbezeichnung gefüllt werden!
+
+Der Agent fragt im Gespräch DIREKT nach Berufsbezeichnungen/Positionen:
+- "Was haben Sie gelernt?" / "Was haben Sie denn gelernt?"
+- "Was für Tätigkeiten haben Sie?" / "Was machen Sie beruflich?"
+- "Als was arbeiten Sie?" / "Welche Position haben Sie?"
+- "Wo waren Sie dort?" / "Was haben Sie da gemacht?"
+
+⚠️ Die Antwort des Kandidaten ist die POSITION - übernehme sie EXAKT!
+
+✅ BEISPIELE KORREKTE EXTRAKTION:
+┌────────────────────────────────────────────────────────────────┐
+│ Agent: "Was haben Sie denn gelernt?"                           │
+│ Kandidat: "Ich bin staatlich anerkannte Erzieherin"           │
+│ → position: "Staatlich anerkannte Erzieherin" ✅               │
+│                                                                 │
+│ Agent: "Was für Tätigkeiten haben Sie?"                        │
+│ Kandidat: "Ich bin in der Hardwarekonstruktion tätig"         │
+│ → position: "Hardwarekonstrukteur" ✅                          │
+│                                                                 │
+│ Agent: "Wo waren Sie dort?"                                    │
+│ Kandidat: "Da war ich Kita-Leitung"                           │
+│ → position: "Kita-Leitung" ✅                                  │
+│                                                                 │
+│ Kandidat: "Ich arbeite als stellvertretende Kita-Leitung"     │
+│ → position: "Stellvertretende Kita-Leitung" ✅                │
+│                                                                 │
+│ Kandidat: "Ich bin Pflegefachmann"                            │
+│ → position: "Pflegefachmann" ✅                                │
+└────────────────────────────────────────────────────────────────┘
+
+✅ UMFORMUNGEN BEI VAGEN ANGABEN:
+- "Ich bin in der Konstruktion tätig" → position: "Konstrukteur"
+- "Ich arbeite in der Pflege" → position: "Pflegefachkraft"
+- "Ich bin in der IT" → position: "IT-Fachkraft"
+- "Ich mache Buchhaltung" → position: "Buchhalter"
+
+❌ NIEMALS vage Positionen wie:
+- "Arbeit in der Konstruktion" ❌
+- "Tätig in der Pflege" ❌
+- "Mitarbeiter bei Firma X" ❌
+- "Beschäftigt im Bereich IT" ❌
+
+🚨 REGEL: position ist ein PFLICHTFELD - JEDE Experience braucht eine konkrete Berufsbezeichnung!
 
 ═══════════════════════════════════════════════════════════════════
 PERSÖNLICHE DATEN - WOHNORT & POSTLEITZAHL (KRITISCH!)
@@ -791,7 +879,11 @@ OUTPUT JSON SCHEMA
   "start": "YYYY-MM-DD"|null,
   "experiences": [
     {
-      "position": string (🚨 ABSOLUTES PFLICHTFELD! Konkrete Berufsbezeichnung, z.B. "Konstrukteur", "Werkstudent Hardwarekonstruktion", "Pflegefachkraft"),
+      "position": string (🚨🚨🚨 ABSOLUTES PFLICHTFELD - KOMMT ZUERST! 🚨🚨🚨
+                          Konkrete Berufsbezeichnung, die der Kandidat nennt!
+                          Beispiele: "Konstrukteur", "Staatlich anerkannte Erzieherin", 
+                          "Kita-Leitung", "Pflegefachmann", "Werkstudent Hardwarekonstruktion"
+                          NIEMALS vage wie "Arbeit in..." oder "tätig als..."!),
       "start": "YYYY-MM-DD"|null,
       "end": "YYYY-MM-DD"|null,
       "company": string (PFLICHT - vollständiger Firmenname, z.B. "Windmüller und Hölscher GmbH, Lengrich"),
