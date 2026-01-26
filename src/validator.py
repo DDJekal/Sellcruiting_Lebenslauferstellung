@@ -164,15 +164,23 @@ class Validator:
                     if not prompt:
                         continue
                     
-                    # Option ist erfüllt wenn:
-                    # - checked=True ODER
-                    # - value ist gesetzt UND confidence >= 0.7 UND hat Evidence
-                    is_fulfilled = (
-                        prompt.answer.checked == True or
-                        (prompt.answer.value and 
-                         prompt.answer.confidence >= 0.7 and 
-                         len(prompt.answer.evidence) > 0)
-                    )
+                    # Option ist erfüllt basierend auf checked-Status:
+                    # - checked=False → NICHT erfüllt (explizite Ablehnung, z.B. B1 statt B2)
+                    # - checked=True → erfüllt
+                    # - checked=null → Fallback auf value + confidence + evidence
+                    if prompt.answer.checked == False:
+                        # Explizit False → nicht erfüllt, egal was value/confidence sagen
+                        is_fulfilled = False
+                    elif prompt.answer.checked == True:
+                        # Explizit True → erfüllt
+                        is_fulfilled = True
+                    else:
+                        # checked ist null/None → Fallback auf value + confidence
+                        is_fulfilled = (
+                            prompt.answer.value and 
+                            prompt.answer.confidence >= 0.7 and 
+                            len(prompt.answer.evidence) > 0
+                        )
                     
                     if is_fulfilled:
                         fulfilled_options.append({
@@ -268,12 +276,17 @@ class Validator:
                     )
                     
                     if is_qualification_question:
-                        is_fulfilled = (
-                            prompt.answer.checked == True or
-                            (prompt.answer.value and 
-                             prompt.answer.confidence >= 0.7 and 
-                             len(prompt.answer.evidence) > 0)
-                        )
+                        # Gleiche Logik wie bei qualification_groups
+                        if prompt.answer.checked == False:
+                            is_fulfilled = False
+                        elif prompt.answer.checked == True:
+                            is_fulfilled = True
+                        else:
+                            is_fulfilled = (
+                                prompt.answer.value and 
+                                prompt.answer.confidence >= 0.7 and 
+                                len(prompt.answer.evidence) > 0
+                            )
                         
                         if is_fulfilled:
                             implicit_qualifications.append({
