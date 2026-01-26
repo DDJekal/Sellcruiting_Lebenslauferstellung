@@ -388,7 +388,7 @@ class QualificationMatcher:
             return [opt.strip() for opt in options if opt.strip() and len(opt.strip()) > 2]
         
         # Alternative: Nach "zum/zur" suchen
-        match = re.search(r"zum|zur\s+([\w\s,\-\/]+(?:\s+oder\s+[\w\s,\-\/]+)*)", question, re.IGNORECASE)
+        match = re.search(r"zu[mr]\s+([\w\s,\-\/]+(?:\s+oder\s+[\w\s,\-\/]+)*)", question, re.IGNORECASE)
         if match:
             options_text = match.group(1)
             options = re.split(r'\s+oder\s+|,\s*', options_text)
