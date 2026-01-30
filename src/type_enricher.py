@@ -431,6 +431,9 @@ Antworte nur mit JSON im angegebenen Format."""
                 )
         
         except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"⚠️ [TYPE_ENRICHER] LLM classification failed, using fallback: {e}")
             print(f"Warning: LLM classification failed: {e}")
             # Fallback to safe defaults
             for prompt, page_name in prompts_with_pages:

@@ -2,6 +2,7 @@
 import os
 import json
 import logging
+import asyncio
 from typing import Dict, Any, Optional
 from datetime import datetime
 import httpx
@@ -71,55 +72,79 @@ class HOCClient:
                 logger.error(f"❌ [RESUME] Error: {e}")
                 results["resume"] = {"error": str(e)}
             
+            # WICHTIG: Kurzer Delay nach Resume-Save, damit HOC API Zeit hat, den Applicant zu erstellen
+            if "error" not in results.get("resume", {}):
+                logger.info("⏳ Waiting 1.5s for HOC API to process applicant...")
+                await asyncio.sleep(1.5)
+            
             # 2. Send Transcript/Protocol to /api/v1/campaigns/{campaign_id}/transcript/ (ZWEITENS)
-            try:
-                transcript_payload = self._prepare_transcript_payload(data)
-                
-                # Log detailed protocol structure
-                total_prompts = sum(len(page.get("prompts", [])) for page in transcript_payload.get("pages", []))
-                answered_prompts = sum(
-                    1 for page in transcript_payload.get("pages", [])
-                    for prompt in page.get("prompts", [])
-                    if prompt.get("checked") is not None or prompt.get("answer") is not None
-                )
-                logger.info(f"📤 [TRANSCRIPT] Sending protocol: {len(transcript_payload.get('pages', []))} pages, {total_prompts} prompts ({answered_prompts} answered)")
-                logger.info(f"📤 [TRANSCRIPT] Full payload: {json.dumps(transcript_payload, ensure_ascii=False, default=str)}")
-                
-                response_transcript = await client.post(
-                    f"{self.api_url}/campaigns/{campaign_id}/transcript/",
-                    json=transcript_payload,
-                    headers=headers
-                )
-                response_transcript.raise_for_status()
-                results["transcript"] = response_transcript.json()
-                logger.info(f"✅ [TRANSCRIPT] Response: {results['transcript']}")
-                
-            except httpx.HTTPStatusError as e:
-                logger.error(f"❌ [TRANSCRIPT] API error: {e.response.status_code} - {e.response.text}")
-                results["transcript"] = {"error": str(e), "status_code": e.response.status_code}
-            except Exception as e:
-                logger.error(f"❌ [TRANSCRIPT] Error: {e}")
-                results["transcript"] = {"error": str(e)}
+            transcript_payload = self._prepare_transcript_payload(data)
+            
+            # Log detailed protocol structure
+            total_prompts = sum(len(page.get("prompts", [])) for page in transcript_payload.get("pages", []))
+            answered_prompts = sum(
+                1 for page in transcript_payload.get("pages", [])
+                for prompt in page.get("prompts", [])
+                if prompt.get("checked") is not None or prompt.get("answer") is not None
+            )
+            logger.info(f"📤 [TRANSCRIPT] Sending protocol: {len(transcript_payload.get('pages', []))} pages, {total_prompts} prompts ({answered_prompts} answered)")
+            logger.info(f"📤 [TRANSCRIPT] Full payload: {json.dumps(transcript_payload, ensure_ascii=False, default=str)}")
+            
+            # Retry-Mechanismus für Transcript (max 3 Versuche bei 404)
+            for attempt in range(3):
+                try:
+                    response_transcript = await client.post(
+                        f"{self.api_url}/campaigns/{campaign_id}/transcript/",
+                        json=transcript_payload,
+                        headers=headers
+                    )
+                    response_transcript.raise_for_status()
+                    results["transcript"] = response_transcript.json()
+                    logger.info(f"✅ [TRANSCRIPT] Response: {results['transcript']}")
+                    break  # Erfolg - aus der Schleife
+                    
+                except httpx.HTTPStatusError as e:
+                    if e.response.status_code == 404 and attempt < 2:
+                        logger.warning(f"⚠️ [TRANSCRIPT] Attempt {attempt + 1}/3 failed with 404, retrying in 2s...")
+                        await asyncio.sleep(2)
+                        continue
+                    logger.error(f"❌ [TRANSCRIPT] API error: {e.response.status_code} - {e.response.text}")
+                    results["transcript"] = {"error": str(e), "status_code": e.response.status_code}
+                    break
+                except Exception as e:
+                    logger.error(f"❌ [TRANSCRIPT] Error: {e}")
+                    results["transcript"] = {"error": str(e)}
+                    break
             
             # 3. Send Metadata to /api/v1/applicants/ai/call/meta (DRITTENS)
-            try:
-                meta_payload = self._prepare_meta_payload(data)
-                logger.info(f"📤 [METADATA] Full payload: {json.dumps(meta_payload, ensure_ascii=False, default=str)}")
-                response_meta = await client.post(
-                    f"{self.api_url}/applicants/ai/call/meta",
-                    json=meta_payload,
-                    headers=headers
-                )
-                response_meta.raise_for_status()
-                results["metadata"] = response_meta.json()
-                logger.info(f"✅ [METADATA] Response: {results['metadata']}")
-                
-            except httpx.HTTPStatusError as e:
-                logger.error(f"❌ [METADATA] API error: {e.response.status_code} - {e.response.text}")
-                results["metadata"] = {"error": str(e), "status_code": e.response.status_code}
-            except Exception as e:
-                logger.error(f"❌ [METADATA] Error: {e}")
-                results["metadata"] = {"error": str(e)}
+            meta_payload = self._prepare_meta_payload(data)
+            logger.info(f"📤 [METADATA] Full payload: {json.dumps(meta_payload, ensure_ascii=False, default=str)}")
+            
+            # Retry-Mechanismus für Metadata (max 3 Versuche bei 404)
+            for attempt in range(3):
+                try:
+                    response_meta = await client.post(
+                        f"{self.api_url}/applicants/ai/call/meta",
+                        json=meta_payload,
+                        headers=headers
+                    )
+                    response_meta.raise_for_status()
+                    results["metadata"] = response_meta.json()
+                    logger.info(f"✅ [METADATA] Response: {results['metadata']}")
+                    break  # Erfolg - aus der Schleife
+                    
+                except httpx.HTTPStatusError as e:
+                    if e.response.status_code == 404 and attempt < 2:
+                        logger.warning(f"⚠️ [METADATA] Attempt {attempt + 1}/3 failed with 404, retrying in 2s...")
+                        await asyncio.sleep(2)
+                        continue
+                    logger.error(f"❌ [METADATA] API error: {e.response.status_code} - {e.response.text}")
+                    results["metadata"] = {"error": str(e), "status_code": e.response.status_code}
+                    break
+                except Exception as e:
+                    logger.error(f"❌ [METADATA] Error: {e}")
+                    results["metadata"] = {"error": str(e)}
+                    break
         
         # Log summary
         success_count = sum(1 for r in results.values() if "error" not in r)
