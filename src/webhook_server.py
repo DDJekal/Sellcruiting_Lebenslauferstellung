@@ -4,14 +4,18 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
+from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, BackgroundTasks, HTTPException
+from fastapi import FastAPI, Request, BackgroundTasks, HTTPException, Query
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
+
+# Database import (optional - only if DATABASE_URL is set)
+DATABASE_ENABLED = bool(os.getenv("DATABASE_URL"))
 
 # Setup logging
 logging.basicConfig(
@@ -20,11 +24,39 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Initialize FastAPI
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifecycle: startup and shutdown."""
+    # Startup
+    if DATABASE_ENABLED:
+        try:
+            from database import DatabaseClient
+            await DatabaseClient.init_tables()
+            logger.info("✅ [STARTUP] Database initialized")
+        except Exception as e:
+            logger.error(f"❌ [STARTUP] Database initialization failed: {e}")
+    else:
+        logger.info("ℹ️ [STARTUP] Database not configured (DATABASE_URL not set)")
+    
+    yield
+    
+    # Shutdown
+    if DATABASE_ENABLED:
+        try:
+            from database import DatabaseClient
+            await DatabaseClient.close_pool()
+            logger.info("✅ [SHUTDOWN] Database connection closed")
+        except Exception as e:
+            logger.error(f"❌ [SHUTDOWN] Error closing database: {e}")
+
+
+# Initialize FastAPI with lifespan
 app = FastAPI(
     title="KI-Sellcruiting Pipeline",
     description="ElevenLabs Webhook → Protocol Filling → Resume Generation → HOC API",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 
@@ -48,9 +80,24 @@ async def health_check():
             "openai_api_key": bool(os.getenv("OPENAI_API_KEY")),
             "anthropic_api_key": bool(os.getenv("ANTHROPIC_API_KEY")),
             "hoc_api_configured": bool(os.getenv("HIRINGS_API_URL") and os.getenv("HIRING_API_TOKEN")),
+            "database_configured": DATABASE_ENABLED,
         },
         "timestamp": datetime.utcnow().isoformat()
     }
+    
+    # Check database connection if configured
+    if DATABASE_ENABLED:
+        try:
+            from database import DatabaseClient
+            pool = await DatabaseClient.get_pool()
+            # Quick connection test
+            async with pool.acquire() as conn:
+                await conn.fetchval("SELECT 1")
+            health["checks"]["database_connected"] = True
+        except Exception as e:
+            health["checks"]["database_connected"] = False
+            health["status"] = "degraded"
+            health["warning"] = f"Database connection failed: {str(e)}"
     
     # Check if critical dependencies are available
     if not health["checks"]["openai_api_key"]:
@@ -125,7 +172,7 @@ async def process_webhook(webhook_data: Dict[str, Any], conversation_id: str):
     1. Run processing pipeline
     2. Generate Protocol + Resume
     3. Send to HOC API
-    4. Log results
+    4. Log to database
     """
     try:
         logger.info(f"Starting pipeline for conversation: {conversation_id}")
@@ -133,6 +180,11 @@ async def process_webhook(webhook_data: Dict[str, Any], conversation_id: str):
         # Import here to avoid circular imports
         from pipeline_processor import process_elevenlabs_call
         from hoc_client import send_to_hoc
+        from elevenlabs_transformer import ElevenLabsTransformer
+        
+        # Extract metadata for DB logging (before pipeline)
+        transformer = ElevenLabsTransformer()
+        elevenlabs_metadata = transformer.extract_metadata(webhook_data)
         
         # Run pipeline
         result = process_elevenlabs_call(webhook_data)
@@ -140,6 +192,15 @@ async def process_webhook(webhook_data: Dict[str, Any], conversation_id: str):
         logger.info(f"Pipeline completed: Applicant ID {result['applicant_id']}")
         logger.info(f"  - Experiences: {result['experiences_count']}")
         logger.info(f"  - Educations: {result['educations_count']}")
+        
+        # Extract qualification info
+        qualification = result.get("qualification", {})
+        is_qualified = qualification.get("is_qualified")
+        failed_criteria = qualification.get("errors", []) if is_qualified == False else None
+        
+        logger.info(f"  - Qualified: {is_qualified}")
+        if failed_criteria:
+            logger.info(f"  - Failed criteria: {failed_criteria}")
         
         # Send to HOC (if configured)
         if os.getenv("HIRINGS_API_URL") and os.getenv("HIRING_API_TOKEN"):
@@ -151,10 +212,39 @@ async def process_webhook(webhook_data: Dict[str, Any], conversation_id: str):
         else:
             logger.warning("HIRINGS_API_URL or HIRING_API_TOKEN not configured, skipping HOC submission")
         
+        # Log to database (if configured)
+        if DATABASE_ENABLED:
+            try:
+                from database import DatabaseClient
+                await DatabaseClient.log_call(
+                    conversation_id=conversation_id,
+                    metadata=elevenlabs_metadata,
+                    is_qualified=is_qualified,
+                    failed_criteria=failed_criteria
+                )
+            except Exception as db_error:
+                logger.error(f"Database logging error: {db_error}", exc_info=True)
+        
         logger.info(f"Processing completed for conversation: {conversation_id}")
         
     except Exception as e:
         logger.error(f"Error in background processing: {e}", exc_info=True)
+        
+        # Still try to log failed call to database
+        if DATABASE_ENABLED:
+            try:
+                from database import DatabaseClient
+                from elevenlabs_transformer import ElevenLabsTransformer
+                transformer = ElevenLabsTransformer()
+                elevenlabs_metadata = transformer.extract_metadata(webhook_data)
+                await DatabaseClient.log_call(
+                    conversation_id=conversation_id,
+                    metadata=elevenlabs_metadata,
+                    is_qualified=None,  # Processing failed
+                    failed_criteria=None
+                )
+            except Exception as db_error:
+                logger.error(f"Database logging error for failed call: {db_error}")
 
 
 @app.post("/test/pipeline")
@@ -373,6 +463,108 @@ async def list_conversations():
         
     except Exception as e:
         logger.error(f"Error listing conversations: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
+# KPI ENDPOINTS
+# =============================================================================
+
+@app.get("/api/kpis/summary")
+async def get_kpi_summary(campaign_id: Optional[str] = Query(None, description="Filter by campaign ID")):
+    """
+    Get KPI summary statistics.
+    
+    Returns metrics like:
+    - Total calls
+    - Success rate
+    - Qualification rate
+    - Average call duration
+    - Total costs
+    - Termination reasons distribution
+    """
+    if not DATABASE_ENABLED:
+        raise HTTPException(
+            status_code=503,
+            detail="Database not configured. Set DATABASE_URL environment variable."
+        )
+    
+    try:
+        from database import DatabaseClient
+        summary = await DatabaseClient.get_kpi_summary(campaign_id=campaign_id)
+        return summary
+    except Exception as e:
+        logger.error(f"Error getting KPI summary: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/kpis/calls")
+async def get_calls(
+    limit: int = Query(50, ge=1, le=500, description="Maximum number of results"),
+    offset: int = Query(0, ge=0, description="Offset for pagination"),
+    campaign_id: Optional[str] = Query(None, description="Filter by campaign ID"),
+    is_qualified: Optional[bool] = Query(None, description="Filter by qualification status")
+):
+    """
+    Get list of calls with optional filters.
+    
+    Supports pagination via limit/offset.
+    """
+    if not DATABASE_ENABLED:
+        raise HTTPException(
+            status_code=503,
+            detail="Database not configured. Set DATABASE_URL environment variable."
+        )
+    
+    try:
+        from database import DatabaseClient
+        calls = await DatabaseClient.get_calls(
+            limit=limit,
+            offset=offset,
+            campaign_id=campaign_id,
+            is_qualified=is_qualified
+        )
+        return {
+            "calls": calls,
+            "count": len(calls),
+            "limit": limit,
+            "offset": offset,
+            "filters": {
+                "campaign_id": campaign_id,
+                "is_qualified": is_qualified
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error getting calls: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/kpis/failed-criteria")
+async def get_failed_criteria_stats(
+    campaign_id: Optional[str] = Query(None, description="Filter by campaign ID")
+):
+    """
+    Get statistics on which criteria fail most often.
+    
+    Returns a dictionary mapping criterion names to failure counts,
+    sorted by most common failures first.
+    """
+    if not DATABASE_ENABLED:
+        raise HTTPException(
+            status_code=503,
+            detail="Database not configured. Set DATABASE_URL environment variable."
+        )
+    
+    try:
+        from database import DatabaseClient
+        stats = await DatabaseClient.get_failed_criteria_stats(campaign_id=campaign_id)
+        return {
+            "failed_criteria": stats,
+            "total_unique_criteria": len(stats),
+            "campaign_id": campaign_id
+        }
+    except Exception as e:
+        logger.error(f"Error getting failed criteria stats: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
