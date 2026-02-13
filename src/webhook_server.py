@@ -325,10 +325,12 @@ async def _maybe_run_analysis(
     """
     Check if call qualifies for analysis, and run it.
     
-    Triggers:
-    1. "hangup" - Bewerber hat aufgelegt (termination_reason = "Call ended by remote party")
-       AND call > 1 minute
-    2. "long_call" - Call > 8 minutes
+    Trigger-Logik (Prioritaet):
+    1. "hangup"    - Bewerber hat aufgelegt UND Call > 2 Minuten
+    2. "long_call" - Call > 8 Minuten  
+    3. "standard"  - Call > 5 Minuten
+    
+    Ergebnisse werden in separater call_analyses Tabelle gespeichert.
     """
     duration_secs = metadata.get("call_duration_secs") or 0
     termination_reason = metadata.get("termination_reason", "")
@@ -336,15 +338,20 @@ async def _maybe_run_analysis(
     
     trigger = None
     
-    # Check hangup trigger: remote party ended + > 1 min
-    if termination_reason == "Call ended by remote party" and duration_mins > 1:
+    # 1. Hangup trigger: remote party ended + > 2 min (kurze Abbrecher ignorieren)
+    if termination_reason == "Call ended by remote party" and duration_mins > 2:
         trigger = "hangup"
         logger.info(f"[ANALYSIS] Trigger: hangup (duration={duration_mins:.1f}min)")
     
-    # Check long call trigger: > 8 minutes
+    # 2. Long call trigger: > 8 minutes
     elif duration_mins > 8:
         trigger = "long_call"
         logger.info(f"[ANALYSIS] Trigger: long_call (duration={duration_mins:.1f}min)")
+    
+    # 3. Standard trigger: > 5 minutes
+    elif duration_mins > 5:
+        trigger = "standard"
+        logger.info(f"[ANALYSIS] Trigger: standard (duration={duration_mins:.1f}min)")
     
     if not trigger:
         logger.info(f"[ANALYSIS] No trigger (duration={duration_mins:.1f}min, reason={termination_reason})")
@@ -362,12 +369,12 @@ async def _maybe_run_analysis(
     )
     
     if analysis_result:
-        await DatabaseClient.update_analysis(
+        analysis_id = await DatabaseClient.save_analysis(
             call_id=call_id,
             analysis=analysis_result,
             trigger=trigger
         )
-        logger.info(f"[ANALYSIS] Saved to DB for call_id={call_id}")
+        logger.info(f"[ANALYSIS] Saved to call_analyses: call_id={call_id}, analysis_id={analysis_id}")
     else:
         logger.warning(f"[ANALYSIS] Analysis returned None for call_id={call_id}")
 
@@ -723,6 +730,34 @@ async def get_hangup_analyses(
         }
     except Exception as e:
         logger.error(f"Error getting hangup analyses: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/analysis/all")
+async def get_all_analyses(
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    trigger_type: Optional[str] = Query(None, description="Filter by trigger type: hangup, standard, long_call"),
+    _auth: bool = Depends(verify_analytics_key)
+):
+    """Get all call analyses with optional trigger filter."""
+    if not DATABASE_ENABLED:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    
+    try:
+        from database import DatabaseClient
+        analyses = await DatabaseClient.get_analyses(
+            limit=limit, offset=offset, trigger_type=trigger_type
+        )
+        return {
+            "analyses": analyses,
+            "count": len(analyses),
+            "limit": limit,
+            "offset": offset,
+            "trigger_type": trigger_type
+        }
+    except Exception as e:
+        logger.error(f"Error getting analyses: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
