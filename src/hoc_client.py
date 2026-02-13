@@ -262,15 +262,6 @@ class HOCClient:
             "phone": "+49 15204465582"
           },
           "protocol_source": "api_campaign_255",
-          "qualification": {
-            "is_qualified": true/false,
-            "anerkennung_status": "ja"|"in_bearbeitung"|"nein"|null,
-            "summary": "Bewerber qualifiziert: ...",
-            "evaluation_method": "qualification_groups+must_criteria+anerkennung_check",
-            "fulfilled_count": 3,
-            "total_count": 4,
-            "errors": []
-          },
           "elevenlabs": {...},
           "temporal_context": {...},
           "processing": {...},
@@ -283,9 +274,6 @@ class HOCClient:
         processing = metadata.get("processing", {})
         files = metadata.get("files", {})
         applicant_data = data.get("applicant", {})
-        
-        # Qualification data (from validator)
-        qualification = data.get("qualification", metadata.get("qualification", {}))
         
         # Enrich elevenlabs with formatted values
         elevenlabs_enriched = self._enrich_elevenlabs_metadata(elevenlabs)
@@ -304,15 +292,6 @@ class HOCClient:
                 "phone": applicant_data.get("phone")
             },
             "protocol_source": data.get("protocol_source", f"api_campaign_{campaign_id}"),
-            "qualification": {
-                "is_qualified": qualification.get("is_qualified"),
-                "anerkennung_status": qualification.get("anerkennung_status"),
-                "summary": qualification.get("summary"),
-                "evaluation_method": qualification.get("evaluation_method"),
-                "fulfilled_count": qualification.get("fulfilled_count"),
-                "total_count": qualification.get("total_count"),
-                "errors": qualification.get("errors", [])
-            },
             "elevenlabs": elevenlabs_enriched,
             "temporal_context": temporal_enriched,
             "processing": processing,
