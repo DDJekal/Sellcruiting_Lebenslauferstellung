@@ -230,9 +230,19 @@ class ResumeBuilder:
                     description=edu.get('description', '')
                 ))
             
-            # Extract postal_code and city from LLM
+            # Extract postal_code, city and anerkennung_status from LLM
             postal_code_llm = result.get('postal_code')
             city_llm = result.get('city')
+            anerkennung_status = result.get('anerkennung_status')
+            
+            # Validate anerkennung_status
+            valid_statuses = ["ja", "in_bearbeitung", "nein", None]
+            if anerkennung_status not in valid_statuses:
+                print(f"   [WARN] Ungültiger anerkennung_status: '{anerkennung_status}' → null")
+                anerkennung_status = None
+            
+            if anerkennung_status:
+                print(f"   [INFO] Anerkennung Status: {anerkennung_status}")
             
             # FALLBACK: If LLM didn't find PLZ, try regex as backup
             if not postal_code_llm:
@@ -275,6 +285,7 @@ class ResumeBuilder:
                 id=resume_id,
                 postal_code=postal_code_llm,
                 city=city_llm,
+                anerkennung_status=anerkennung_status,
                 preferred_contact_time=result.get('preferred_contact_time'),
                 preferred_workload=result.get('preferred_workload'),
                 willing_to_relocate=result.get('willing_to_relocate'),
@@ -882,6 +893,48 @@ EDUCATIONS - VOLLSTÄNDIGKEIT (KRITISCH)
    5. Auch bei "beantragt" oder "läuft noch" → 2 Einträge!
 
 ═══════════════════════════════════════════════════════════════════
+ANERKENNUNG AUSLÄNDISCHER ABSCHLÜSSE - FLAG (KRITISCH!)
+═══════════════════════════════════════════════════════════════════
+
+⚠️ PFLICHTFELD: Extrahiere den Anerkennungsstatus als separates Flag!
+
+LOGIK:
+1. Hat der Kandidat eine AUSLÄNDISCHE Ausbildung/Studium erwähnt?
+   → Wenn NEIN: anerkennung_status = null (nicht relevant)
+   → Wenn JA: Weiter zu Schritt 2
+
+2. Wurde die DEUTSCHE ANERKENNUNG erwähnt?
+   → "anerkannt", "Anerkennung erhalten", "gleichwertig": anerkennung_status = "ja"
+   → "beantragt", "läuft noch", "in Bearbeitung": anerkennung_status = "in_bearbeitung"
+   → Keine Erwähnung oder "nicht anerkannt": anerkennung_status = "nein"
+
+3. Sonderfälle:
+   → Deutsche Ausbildung/Studium (keine ausländische): anerkennung_status = null
+   → Unklar ob ausländisch: anerkennung_status = null
+
+BEISPIELE:
+┌────────────────────────────────────────────────────────────────┐
+│ "Ausbildung in Türkei, vom RP Stuttgart anerkannt"            │
+│ → anerkennung_status: "ja"                                     │
+│                                                                 │
+│ "Studium in Polen, Anerkennung beantragt"                     │
+│ → anerkennung_status: "in_bearbeitung"                         │
+│                                                                 │
+│ "Ausbildung in Syrien gemacht" (keine Anerkennung erwähnt)    │
+│ → anerkennung_status: "nein"                                   │
+│                                                                 │
+│ "Ausbildung in Deutschland gemacht"                            │
+│ → anerkennung_status: null (nicht relevant)                    │
+│                                                                 │
+│ "Hab Abitur gemacht, dann BWL studiert in München"            │
+│ → anerkennung_status: null (deutsche Bildung)                  │
+└────────────────────────────────────────────────────────────────┘
+
+⚠️ KEYWORDS für ausländische Bildung:
+- Ländernamen: Türkei, Syrien, Polen, Rumänien, Bulgarien, Ukraine, etc.
+- "im Ausland", "nicht in Deutschland", "in meiner Heimat"
+
+═══════════════════════════════════════════════════════════════════
 WEITERE FELDER
 ═══════════════════════════════════════════════════════════════════
 
@@ -922,6 +975,7 @@ Vor dem Senden überprüfen:
    - Ist "postal_code" ausgefüllt? (Wenn ja → GUT! Wenn nein → NOCHMAL SUCHEN!)
    - Hat JEDE Experience ein "position"-Feld? (Zähle nach: experiences.length == positions.length?)
    - Sind alle "position"-Werte konkrete Berufsbezeichnungen? (Keine "Arbeit in..." oder "tätig als..."!)
+   - Ist "anerkennung_status" korrekt gesetzt? (ausländische Bildung → ja/in_bearbeitung/nein, deutsche → null)
 
 🚨 ABLEHNUNGSGRÜNDE (DIESE FEHLER FÜHREN ZU DATENVERLUST!):
 - ❌ Experiences OHNE "position"-Feld werden KOMPLETT GELÖSCHT! (KRITISCH!)
@@ -944,6 +998,7 @@ OUTPUT JSON SCHEMA
 {
   "postal_code": string|null (5-stellige PLZ, z.B. "10115", "90402" - NUR wenn im Transkript erwähnt!),
   "city": string|null (Stadt/Ort, z.B. "Berlin", "München", "Lotte" - NUR wenn im Transkript erwähnt!),
+  "anerkennung_status": "ja"|"in_bearbeitung"|"nein"|null (Status der Anerkennung ausländischer Abschlüsse - null wenn keine ausländische Bildung),
   "preferred_contact_time": string|null,
   "preferred_workload": string|null (z.B. "Vollzeit (40h/Woche)" oder "Teilzeit (25h/Woche)" - bei Teilzeit IMMER mit Stundenzahl!),
   "willing_to_relocate": "ja"|"nein"|null,

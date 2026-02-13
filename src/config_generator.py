@@ -42,6 +42,15 @@ class ConfigGenerator:
             "implicit_defaults": self._generate_implicit_defaults(protocol)
         }
         
+        # WARNUNG bei leerer Qualifikationskonfiguration
+        has_must_criteria = len(config["must_criteria"]) > 0
+        has_qual_groups = len(config["qualification_groups"]) > 0
+        
+        if not has_must_criteria and not has_qual_groups:
+            import logging
+            logging.warning(f"⚠️ WARNUNG: Template {template_id} hat KEINE Qualifikationskriterien! "
+                          f"Alle Kandidaten werden als qualifiziert eingestuft (implicit_detection).")
+        
         # Write to file if path provided
         if output_path:
             output_file = Path(output_path)
@@ -51,7 +60,14 @@ class ConfigGenerator:
                 # Add header comment
                 f.write(f"# Auto-generated config for: {template_name}\n")
                 f.write(f"# Template ID: {template_id}\n")
-                f.write(f"# Generated from protocol template\n\n")
+                f.write(f"# Generated from protocol template\n")
+                
+                # WARNUNG bei leerer Config in Datei schreiben
+                if not has_must_criteria and not has_qual_groups:
+                    f.write(f"# ⚠️ WARNUNG: Keine Qualifikationskriterien erkannt!\n")
+                    f.write(f"# Alle Kandidaten werden als qualifiziert eingestuft.\n")
+                
+                f.write("\n")
                 yaml.dump(config, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
             
             print(f"[OK] Config geschrieben: {output_file}")
@@ -203,20 +219,72 @@ class ConfigGenerator:
         return aida_mapping
     
     def _extract_must_criteria(self, protocol: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Extract must-have criteria from protocol."""
+        """
+        Extract must-have criteria from protocol.
+        
+        Erweiterte Erkennung:
+        - Prefix: "zwingend:", "muss:", "erforderlich:", "mindestanforderung:", "pflicht:"
+        - Seiten-basiert: "Kriterien"-Seiten mit yes_no Typ
+        - Sprach-Pattern: "deutsch b1", "deutsch b2", "deutsch c1", "b2", "c1"
+        """
         must_criteria = []
         
+        # Prefix-Patterns für must-criteria
+        must_prefixes = [
+            "zwingend:",
+            "muss:",
+            "erforderlich:",
+            "mindestanforderung:",
+            "pflicht:"
+        ]
+        
         for page in protocol.get("pages", []):
+            page_name = page.get("name", "").lower()
+            is_criteria_page = "kriterien" in page_name
+            
             for prompt in page.get("prompts", []):
                 question = prompt.get("question", "")
+                question_lower = question.lower()
                 prompt_id = prompt.get("id")
+                prompt_type = prompt.get("type", "")
                 
-                # Look for "Zwingend:" prefix
-                if question.lower().startswith("zwingend:"):
+                # Skip info prompts
+                if prompt_type == "info":
+                    continue
+                
+                # Method 1: Prefix-basiert
+                if any(question_lower.startswith(prefix) for prefix in must_prefixes):
                     must_criteria.append({
                         "prompt_id": prompt_id,
                         "expected": True,
                         "error_msg": f"Zwingendes Kriterium nicht erfüllt: {question[:60]}..."
+                    })
+                    continue
+                
+                # Method 2: Seiten-basiert (Kriterien-Seite mit yes_no)
+                if is_criteria_page and prompt_type == "yes_no":
+                    must_criteria.append({
+                        "prompt_id": prompt_id,
+                        "expected": True,
+                        "error_msg": f"Qualifikationskriterium nicht erfüllt: {question[:60]}..."
+                    })
+                    continue
+                
+                # Method 3: Sprach-Pattern (Deutsch B2/C1 etc.)
+                deutsch_patterns = [
+                    r"deutsch\s+b[12]",
+                    r"deutsch\s+c[12]",
+                    r"deutschkenntnisse.*b[12]",
+                    r"deutschkenntnisse.*c[12]",
+                    r"^b[12]\s*$",  # nur "B2" als Frage
+                    r"^c[12]\s*$"   # nur "C1" als Frage
+                ]
+                
+                if any(re.search(pattern, question_lower) for pattern in deutsch_patterns):
+                    must_criteria.append({
+                        "prompt_id": prompt_id,
+                        "expected": True,
+                        "error_msg": f"Deutschkenntnisse nicht ausreichend: {question[:60]}..."
                     })
         
         return must_criteria
@@ -229,6 +297,9 @@ class ConfigGenerator:
         1. Einzelne Qualifikationsfragen (automatisch als OR-Gruppe)
         2. Mehrfachoptionen in einer Frage (z.B. "Ausbildung als A, B oder C?")
         3. Mehrere verwandte Fragen (z.B. gruppiert nach "Ausbildung", "Erfahrung")
+        4. "alternativ:"-Prefix → OR-Gruppe (min_required=1)
+        5. "wünschenswert:"-Prefix → optionale Gruppe (is_mandatory=false)
+        6. "zwingend:"-Fragen werden AUCH aufgenommen (da Validator beide Systeme prüft)
         """
         qualification_groups = []
         
@@ -257,10 +328,11 @@ class ConfigGenerator:
                 ]
             },
             "sprachen": {
-                "keywords": ["sprachkenntnisse", "deutschkenntnisse", "englischkenntnisse"],
+                "keywords": ["sprachkenntnisse", "deutschkenntnisse", "englischkenntnisse", "deutsch b1", "deutsch b2", "deutsch c1", "b2", "c1"],
                 "patterns": [
                     r"(deutsch|englisch|französisch)kenntnisse.*([abc][12])",
-                    r"sprach(?:kenntnisse|niveau).*([abc][12])"
+                    r"sprach(?:kenntnisse|niveau).*([abc][12])",
+                    r"deutsch\s+[abc][12]"
                 ]
             },
             "fuehrerschein": {
@@ -271,8 +343,10 @@ class ConfigGenerator:
             }
         }
         
-        # Sammle Fragen nach Kategorie
+        # Sammle Fragen nach Kategorie und Prefix
         categorized_questions = {cat: [] for cat in categories}
+        alternative_groups = []  # Für "alternativ:"-Gruppen
+        optional_questions = []  # Für "wünschenswert:"-Fragen
         
         for page in protocol.get("pages", []):
             for prompt in page.get("prompts", []):
@@ -285,9 +359,28 @@ class ConfigGenerator:
                 if prompt_type in ["info", "recruiter_instruction"]:
                     continue
                 
-                # Skip explizit als "Zwingend:" markierte (werden bereits in must_criteria erfasst)
-                if question_lower.startswith("zwingend:"):
-                    continue
+                # NEU: "alternativ:" Prefix erkennen
+                if question_lower.startswith("alternativ:"):
+                    alternative_groups.append({
+                        "prompt_id": prompt_id,
+                        "question": question,
+                        "page": page.get("name", ""),
+                        "question_lower": question_lower
+                    })
+                    continue  # Wird separat behandelt
+                
+                # NEU: "wünschenswert:" Prefix erkennen
+                if question_lower.startswith("wünschenswert:") or question_lower.startswith("wuenschenswert:"):
+                    optional_questions.append({
+                        "prompt_id": prompt_id,
+                        "question": question,
+                        "page": page.get("name", ""),
+                        "question_lower": question_lower
+                    })
+                    continue  # Wird separat behandelt
+                
+                # GEÄNDERT: "zwingend:"-Fragen NICHT mehr überspringen
+                # Sie werden sowohl in must_criteria als auch in qualification_groups aufgenommen
                 
                 # Kategorisiere Frage
                 for category, config in categories.items():
@@ -393,6 +486,48 @@ class ConfigGenerator:
                     "error_msg": f"Keine der erforderlichen {category.replace('_', ' ')}-Qualifikationen erfüllt"
                 })
                 group_counter += 1
+        
+        # NEU: "alternativ:"-Gruppen verarbeiten
+        if alternative_groups:
+            options = []
+            for alt_q in alternative_groups:
+                options.append({
+                    "prompt_id": alt_q["prompt_id"],
+                    "description": alt_q["question"][11:].strip()[:100],  # "alternativ:" entfernen
+                    "weight": 1.0
+                })
+            
+            qualification_groups.append({
+                "group_id": f"qual_group_{group_counter}",
+                "group_name": "Alternative Qualifikationen",
+                "logic": "OR",
+                "options": options,
+                "min_required": 1,
+                "is_mandatory": True,
+                "error_msg": "Keine der alternativen Qualifikationen erfüllt"
+            })
+            group_counter += 1
+        
+        # NEU: "wünschenswert:"-Gruppen verarbeiten (optional)
+        if optional_questions:
+            options = []
+            for opt_q in optional_questions:
+                options.append({
+                    "prompt_id": opt_q["prompt_id"],
+                    "description": opt_q["question"][14:].strip()[:100],  # "wünschenswert:" entfernen
+                    "weight": 1.0
+                })
+            
+            qualification_groups.append({
+                "group_id": f"qual_group_{group_counter}",
+                "group_name": "Wünschenswerte Qualifikationen",
+                "logic": "OR",
+                "options": options,
+                "min_required": 0,  # Optional
+                "is_mandatory": False,  # Führt nicht zur Disqualifikation
+                "error_msg": ""  # Keine Fehlermeldung, da optional
+            })
+            group_counter += 1
         
         return qualification_groups
     

@@ -124,15 +124,24 @@ class Validator:
     def evaluate_qualification(
         self,
         filled_protocol: FilledProtocol,
-        mandanten_config: MandantenConfig
+        mandanten_config: MandantenConfig,
+        anerkennung_status: str = None
     ) -> Dict[str, Any]:
         """
-        Evaluate if applicant is qualified based on must-criteria and qualification groups.
+        Evaluate if applicant is qualified based on must-criteria, qualification groups
+        and Anerkennung status.
         
         ROBUSTE LOGIK:
         - Prüft qualification_groups mit OR/AND-Logik (Priorität 1)
         - Fallback zu must_criteria (legacy, Priorität 2)
         - Fallback zu impliziter Qualifikationserkennung (Priorität 3)
+        - Anerkennung-Check: "nein" = Ausschlusskriterium
+        
+        Args:
+            anerkennung_status: "ja", "in_bearbeitung", "nein", or None
+                - "ja" / "in_bearbeitung" → Anerkennung-Kriterium erfüllt
+                - "nein" → Ausschlusskriterium, Bewerber nicht qualifiziert
+                - None → nicht relevant (keine ausländische Ausbildung)
         
         Returns:
             Dict with qualification status, summary text, and details
@@ -146,12 +155,12 @@ class Validator:
         errors = []
         fulfilled_count = 0
         total_count = 0
-        evaluation_method = None
+        evaluation_methods = []
         group_evaluations = []
         
         # 1. PRIORITÄT: Qualification Groups (neue flexible Struktur)
         if mandanten_config.qualification_groups:
-            evaluation_method = "qualification_groups"
+            evaluation_methods.append("qualification_groups")
             
             for group in mandanten_config.qualification_groups:
                 fulfilled_options = []
@@ -220,25 +229,25 @@ class Validator:
                     else:
                         error_msg = group.error_msg or f"Gruppe '{group.group_name}' nicht erfüllt"
                         errors.append(error_msg)
-            
-            is_qualified = len(errors) == 0
         
-        # 2. FALLBACK: Legacy must_criteria
-        elif mandanten_config.must_criteria:
-            evaluation_method = "must_criteria_legacy"
-            errors = self.validate_must_criteria(filled_protocol, mandanten_config)
-            total_count = len(mandanten_config.must_criteria)
-            fulfilled_count = total_count - len(errors)
-            is_qualified = len(errors) == 0
+        # 2. ZUSÄTZLICH: Legacy must_criteria (IMMER prüfen wenn vorhanden, nicht nur Fallback)
+        if mandanten_config.must_criteria:
+            evaluation_methods.append("must_criteria")
+            must_errors = self.validate_must_criteria(filled_protocol, mandanten_config)
+            errors.extend(must_errors)
             
-            # Build criteria details for legacy
+            # Zähle für Gesamtbewertung
             for criterion in mandanten_config.must_criteria:
+                total_count += 1
                 prompt = prompts_by_id.get(criterion.prompt_id)
                 if prompt:
                     is_fulfilled = prompt.answer.checked == criterion.expected
+                    if is_fulfilled:
+                        fulfilled_count += 1
+                    
                     group_evaluations.append({
                         "group_id": f"legacy_{criterion.prompt_id}",
-                        "group_name": f"Legacy Criterion {criterion.prompt_id}",
+                        "group_name": f"Must Criterion {criterion.prompt_id}",
                         "logic": "AND",
                         "total_options": 1,
                         "fulfilled_options": 1 if is_fulfilled else 0,
@@ -253,18 +262,20 @@ class Validator:
                         "is_mandatory": True
                     })
         
-        # 3. FALLBACK: Implizite Qualifikationserkennung
-        else:
-            evaluation_method = "implicit_detection"
+        # 3. FALLBACK: Implizite Qualifikationserkennung (nur wenn NICHTS konfiguriert)
+        if not evaluation_methods:
+            evaluation_methods.append("implicit_detection")
             
             qualification_keywords = [
                 'ausbildung', 'studium', 'abschluss', 
                 'berufserfahrung', 'jahre erfahrung',
                 'zertifikat', 'qualifikation', 
-                'deutschkenntnisse', 'führerschein'
+                'deutschkenntnisse', 'deutsch b1', 'deutsch b2', 'deutsch c1',  # Erweitert
+                'führerschein'
             ]
             
             implicit_qualifications = []
+            has_explicit_false = False  # VERSCHÄRFT: Prüfe ob irgendein Kriterium explizit false ist
             
             for page in filled_protocol.pages:
                 for prompt in page.prompts:
@@ -279,6 +290,7 @@ class Validator:
                         # Gleiche Logik wie bei qualification_groups
                         if prompt.answer.checked == False:
                             is_fulfilled = False
+                            has_explicit_false = True  # VERSCHÄRFT: Merke uns dass ein Kriterium nicht erfüllt ist
                         elif prompt.answer.checked == True:
                             is_fulfilled = True
                         else:
@@ -313,26 +325,76 @@ class Validator:
                                 "is_mandatory": False
                             })
             
-            # Mindestens eine Qualifikation muss erfüllt sein
-            is_qualified = len(implicit_qualifications) > 0
+            # VERSCHÄRFT: Wenn irgendein Kriterium explizit false ist, nicht qualifiziert
+            # Sonst: Mindestens eine Qualifikation muss erfüllt sein
+            is_qualified = (len(implicit_qualifications) > 0) and (not has_explicit_false)
             fulfilled_count = len(implicit_qualifications)
             total_count = fulfilled_count  # Nur die gefundenen zählen
             
-            if not is_qualified:
+            if has_explicit_false:
+                errors.append("Mindestens ein Qualifikationskriterium explizit nicht erfüllt")
+            elif not is_qualified:
                 errors.append("Keine Qualifikationsvoraussetzungen im Transkript erfüllt")
         
+        # ANERKENNUNG-CHECK: "nein" = Ausschlusskriterium
+        if anerkennung_status == "nein":
+            errors.append("Ausländischer Abschluss ohne deutsche Anerkennung")
+            evaluation_methods.append("anerkennung_check")
+            total_count += 1
+            group_evaluations.append({
+                "group_id": "anerkennung",
+                "group_name": "Anerkennung ausländischer Abschlüsse",
+                "logic": "REQUIRED",
+                "total_options": 1,
+                "fulfilled_options": 0,
+                "fulfilled_details": [],
+                "is_fulfilled": False,
+                "is_mandatory": True
+            })
+        elif anerkennung_status in ("ja", "in_bearbeitung"):
+            evaluation_methods.append("anerkennung_check")
+            total_count += 1
+            fulfilled_count += 1
+            status_label = "anerkannt" if anerkennung_status == "ja" else "in Bearbeitung"
+            group_evaluations.append({
+                "group_id": "anerkennung",
+                "group_name": "Anerkennung ausländischer Abschlüsse",
+                "logic": "REQUIRED",
+                "total_options": 1,
+                "fulfilled_options": 1,
+                "fulfilled_details": [{
+                    "description": f"Anerkennung: {status_label}",
+                    "weight": 1.0,
+                    "confidence": 0.95 if anerkennung_status == "ja" else 0.80,
+                    "value": anerkennung_status
+                }],
+                "is_fulfilled": True,
+                "is_mandatory": True
+            })
+        
+        # FINALE ENTSCHEIDUNG: is_qualified nur wenn KEINE Fehler
+        is_qualified = len(errors) == 0
+        evaluation_method = "+".join(evaluation_methods) if evaluation_methods else "none"
+        
         # Build summary text
+        anerkennung_note = ""
+        if anerkennung_status == "nein":
+            anerkennung_note = " (Anerkennung fehlt)"
+        elif anerkennung_status == "in_bearbeitung":
+            anerkennung_note = " (Anerkennung in Bearbeitung)"
+        
         if is_qualified:
             if total_count > 0:
-                summary = f"Bewerber qualifiziert: {fulfilled_count}/{total_count} Kriterien erfüllt."
+                summary = f"Bewerber qualifiziert: {fulfilled_count}/{total_count} Kriterien erfüllt.{anerkennung_note}"
             else:
-                summary = "Bewerber qualifiziert: Keine Qualifikationskriterien definiert."
+                summary = f"Bewerber qualifiziert: Keine Qualifikationskriterien definiert.{anerkennung_note}"
         else:
             missing = total_count - fulfilled_count
-            summary = f"Bewerber nicht qualifiziert: {missing}/{total_count} Kriterien nicht erfüllt."
+            summary = f"Bewerber nicht qualifiziert: {missing}/{total_count} Kriterien nicht erfüllt.{anerkennung_note}"
         
         return {
             "is_qualified": is_qualified,
+            "anerkennung_status": anerkennung_status,
             "summary": summary,
             "fulfilled_count": fulfilled_count,
             "total_count": total_count,

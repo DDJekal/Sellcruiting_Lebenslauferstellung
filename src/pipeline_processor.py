@@ -179,8 +179,12 @@ def process_elevenlabs_call(webhook_data: Dict[str, Any]) -> Dict[str, Any]:
     # filled_protocol = validator.apply_implicit_defaults(filled_protocol, mandanten_config)
     filled_protocol = validator.apply_routing_rules(filled_protocol, mandanten_config)
     
-    # Evaluate qualification (jetzt mit enriched protocol!)
-    qualification_evaluation = validator.evaluate_qualification(filled_protocol, mandanten_config)
+    # Evaluate qualification (jetzt mit enriched protocol + Anerkennung!)
+    qualification_evaluation = validator.evaluate_qualification(
+        filled_protocol, 
+        mandanten_config,
+        anerkennung_status=applicant_resume.resume.anerkennung_status
+    )
     
     # Add qualification summary and status to resume
     applicant_resume.resume.summary = qualification_evaluation["summary"]

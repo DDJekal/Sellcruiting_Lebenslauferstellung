@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, BackgroundTasks, HTTPException, Query
+from fastapi import FastAPI, Request, BackgroundTasks, HTTPException, Query, Depends, Header
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 
@@ -17,6 +17,9 @@ load_dotenv()
 # Database import (optional - only if DATABASE_URL is set)
 DATABASE_ENABLED = bool(os.getenv("DATABASE_URL"))
 
+# Analytics API Key
+ANALYTICS_API_KEY = os.getenv("ANALYTICS_API_KEY")
+
 # Setup logging
 logging.basicConfig(
     level=logging.INFO,
@@ -24,6 +27,29 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+# =============================================================================
+# API KEY AUTH
+# =============================================================================
+
+async def verify_analytics_key(x_api_key: str = Header(..., alias="X-API-Key")):
+    """Verify analytics API key from X-API-Key header."""
+    if not ANALYTICS_API_KEY:
+        raise HTTPException(
+            status_code=503,
+            detail="ANALYTICS_API_KEY not configured on server"
+        )
+    if x_api_key != ANALYTICS_API_KEY:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid API key"
+        )
+    return True
+
+
+# =============================================================================
+# LIFESPAN
+# =============================================================================
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -55,10 +81,14 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="KI-Sellcruiting Pipeline",
     description="ElevenLabs Webhook → Protocol Filling → Resume Generation → HOC API",
-    version="1.0.0",
+    version="2.0.0",
     lifespan=lifespan
 )
 
+
+# =============================================================================
+# HEALTH CHECK
+# =============================================================================
 
 @app.get("/")
 async def root():
@@ -66,46 +96,30 @@ async def root():
     return {
         "status": "healthy",
         "service": "ki-sellcruiting-pipeline",
-        "version": "1.0.0",
+        "version": "2.0.0",
         "timestamp": datetime.utcnow().isoformat()
     }
 
 
 @app.get("/health")
 async def health_check():
-    """Detailed health check with environment validation."""
-    health = {
+    """Lightweight health check - no DB query to avoid cold-start timeouts."""
+    return {
         "status": "healthy",
         "checks": {
             "openai_api_key": bool(os.getenv("OPENAI_API_KEY")),
             "anthropic_api_key": bool(os.getenv("ANTHROPIC_API_KEY")),
             "hoc_api_configured": bool(os.getenv("HIRINGS_API_URL") and os.getenv("HIRING_API_TOKEN")),
             "database_configured": DATABASE_ENABLED,
+            "analytics_api_key": bool(ANALYTICS_API_KEY),
         },
         "timestamp": datetime.utcnow().isoformat()
     }
-    
-    # Check database connection if configured
-    if DATABASE_ENABLED:
-        try:
-            from database import DatabaseClient
-            pool = await DatabaseClient.get_pool()
-            # Quick connection test
-            async with pool.acquire() as conn:
-                await conn.fetchval("SELECT 1")
-            health["checks"]["database_connected"] = True
-        except Exception as e:
-            health["checks"]["database_connected"] = False
-            health["status"] = "degraded"
-            health["warning"] = f"Database connection failed: {str(e)}"
-    
-    # Check if critical dependencies are available
-    if not health["checks"]["openai_api_key"]:
-        health["status"] = "degraded"
-        health["warning"] = "OPENAI_API_KEY not configured"
-    
-    return health
 
+
+# =============================================================================
+# WEBHOOK ENDPOINT (unchanged pipeline)
+# =============================================================================
 
 @app.post("/elevenlabs/posthook")
 async def elevenlabs_webhook(
@@ -173,6 +187,7 @@ async def process_webhook(webhook_data: Dict[str, Any], conversation_id: str):
     2. Generate Protocol + Resume
     3. Send to HOC API
     4. Log to database
+    5. Run analysis (if trigger conditions met)
     """
     try:
         logger.info(f"Starting pipeline for conversation: {conversation_id}")
@@ -186,6 +201,9 @@ async def process_webhook(webhook_data: Dict[str, Any], conversation_id: str):
         transformer = ElevenLabsTransformer()
         elevenlabs_metadata = transformer.extract_metadata(webhook_data)
         
+        # Extract transcript for potential analysis
+        raw_transcript = transformer.transform(webhook_data)
+        
         # Run pipeline
         result = process_elevenlabs_call(webhook_data)
         
@@ -196,9 +214,47 @@ async def process_webhook(webhook_data: Dict[str, Any], conversation_id: str):
         # Extract qualification info
         qualification = result.get("qualification", {})
         is_qualified = qualification.get("is_qualified")
+        evaluation_method = qualification.get("evaluation_method", "unknown")
         failed_criteria = qualification.get("errors", []) if is_qualified == False else None
         
+        # FALLBACK: Gespräch kürzer als 2 Minuten → automatisch nicht qualifiziert
+        call_duration_secs = elevenlabs_metadata.get("call_duration_secs") or 0
+        MIN_CALL_DURATION_SECS = 120  # 2 Minuten
+        
+        if call_duration_secs < MIN_CALL_DURATION_SECS and call_duration_secs > 0:
+            duration_mins = round(call_duration_secs / 60, 1)
+            logger.warning(f"  - Call zu kurz ({duration_mins} min < 2 min): "
+                          f"KI-Qualifizierung wird abgelehnt (war: {is_qualified})")
+            is_qualified = False
+            evaluation_method = f"{evaluation_method}+short_call_override"
+            failed_criteria = failed_criteria or []
+            failed_criteria.append(f"Gespräch zu kurz ({duration_mins} min) - nicht genug Information für zuverlässige Qualifizierung")
+            
+            # Override auch im result-Dict, damit HOC die korrekte Info bekommt
+            if "qualification" in result:
+                result["qualification"]["is_qualified"] = False
+                result["qualification"]["evaluation_method"] = evaluation_method
+                if "errors" not in result["qualification"]:
+                    result["qualification"]["errors"] = []
+                result["qualification"]["errors"].append(
+                    f"Gespräch zu kurz ({duration_mins} min) - automatisch nicht qualifiziert"
+                )
+        
         logger.info(f"  - Qualified: {is_qualified}")
+        logger.info(f"  - Evaluation method: {evaluation_method}")
+        
+        # WARNUNG bei implicit_detection (keine Qualifikationskriterien konfiguriert)
+        if "implicit_detection" in evaluation_method:
+            logger.warning("WARNUNG: Keine Qualifikationskriterien konfiguriert! "
+                         "Fallback auf implicit_detection - nahezu alle Kandidaten werden als qualifiziert eingestuft.")
+        
+        # Log Anerkennung-Status
+        anerkennung_status = qualification.get("anerkennung_status")
+        if anerkennung_status:
+            logger.info(f"  - Anerkennung Status: {anerkennung_status}")
+            if anerkennung_status == "nein":
+                logger.warning("  - Ausländischer Abschluss OHNE deutsche Anerkennung → nicht qualifiziert")
+        
         if failed_criteria:
             logger.info(f"  - Failed criteria: {failed_criteria}")
         
@@ -213,10 +269,11 @@ async def process_webhook(webhook_data: Dict[str, Any], conversation_id: str):
             logger.warning("HIRINGS_API_URL or HIRING_API_TOKEN not configured, skipping HOC submission")
         
         # Log to database (if configured)
+        call_id = None
         if DATABASE_ENABLED:
             try:
                 from database import DatabaseClient
-                await DatabaseClient.log_call(
+                call_id = await DatabaseClient.log_call(
                     conversation_id=conversation_id,
                     metadata=elevenlabs_metadata,
                     is_qualified=is_qualified,
@@ -224,6 +281,19 @@ async def process_webhook(webhook_data: Dict[str, Any], conversation_id: str):
                 )
             except Exception as db_error:
                 logger.error(f"Database logging error: {db_error}", exc_info=True)
+        
+        # =====================================================================
+        # CALL ANALYSIS (non-critical background task)
+        # =====================================================================
+        if DATABASE_ENABLED and call_id:
+            try:
+                await _maybe_run_analysis(
+                    call_id=call_id,
+                    transcript=raw_transcript,
+                    metadata=elevenlabs_metadata
+                )
+            except Exception as analysis_error:
+                logger.error(f"Analysis error (non-critical): {analysis_error}", exc_info=True)
         
         logger.info(f"Processing completed for conversation: {conversation_id}")
         
@@ -246,6 +316,65 @@ async def process_webhook(webhook_data: Dict[str, Any], conversation_id: str):
             except Exception as db_error:
                 logger.error(f"Database logging error for failed call: {db_error}")
 
+
+async def _maybe_run_analysis(
+    call_id: int,
+    transcript: List[Dict[str, str]],
+    metadata: Dict[str, Any]
+):
+    """
+    Check if call qualifies for analysis, and run it.
+    
+    Triggers:
+    1. "hangup" - Bewerber hat aufgelegt (termination_reason = "Call ended by remote party")
+       AND call > 1 minute
+    2. "long_call" - Call > 8 minutes
+    """
+    duration_secs = metadata.get("call_duration_secs") or 0
+    termination_reason = metadata.get("termination_reason", "")
+    duration_mins = duration_secs / 60
+    
+    trigger = None
+    
+    # Check hangup trigger: remote party ended + > 1 min
+    if termination_reason == "Call ended by remote party" and duration_mins > 1:
+        trigger = "hangup"
+        logger.info(f"[ANALYSIS] Trigger: hangup (duration={duration_mins:.1f}min)")
+    
+    # Check long call trigger: > 8 minutes
+    elif duration_mins > 8:
+        trigger = "long_call"
+        logger.info(f"[ANALYSIS] Trigger: long_call (duration={duration_mins:.1f}min)")
+    
+    if not trigger:
+        logger.info(f"[ANALYSIS] No trigger (duration={duration_mins:.1f}min, reason={termination_reason})")
+        return
+    
+    # Run analysis
+    from call_analyzer import CallAnalyzer
+    from database import DatabaseClient
+    
+    analyzer = CallAnalyzer()
+    analysis_result = analyzer.analyze(
+        transcript=transcript,
+        metadata=metadata,
+        trigger=trigger
+    )
+    
+    if analysis_result:
+        await DatabaseClient.update_analysis(
+            call_id=call_id,
+            analysis=analysis_result,
+            trigger=trigger
+        )
+        logger.info(f"[ANALYSIS] Saved to DB for call_id={call_id}")
+    else:
+        logger.warning(f"[ANALYSIS] Analysis returned None for call_id={call_id}")
+
+
+# =============================================================================
+# TEST / DEBUG ENDPOINTS
+# =============================================================================
 
 @app.post("/test/pipeline")
 async def test_pipeline(request: Request):
@@ -271,16 +400,54 @@ async def test_pipeline(request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/test/analyze")
+async def test_analyze(request: Request):
+    """
+    Test endpoint for call analysis.
+    
+    Expects JSON with:
+    - transcript: list of {"speaker": "A"|"B", "text": "..."}
+    - metadata: dict with call_duration_secs, termination_reason, etc.
+    - trigger: "hangup" or "long_call" (optional, default "hangup")
+    """
+    try:
+        data = await request.json()
+        
+        transcript = data.get("transcript", [])
+        metadata = data.get("metadata", {})
+        trigger = data.get("trigger", "hangup")
+        
+        if not transcript:
+            raise HTTPException(status_code=400, detail="Missing transcript")
+        
+        from call_analyzer import CallAnalyzer
+        
+        analyzer = CallAnalyzer()
+        result = analyzer.analyze(
+            transcript=transcript,
+            metadata=metadata,
+            trigger=trigger
+        )
+        
+        if result is None:
+            raise HTTPException(status_code=500, detail="Analysis returned None")
+        
+        return {
+            "status": "success",
+            "trigger": trigger,
+            "analysis": result
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Test analyze error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/debug/files")
 async def list_files():
-    """
-    Liste alle gespeicherten Output-Dateien.
-    
-    Returns:
-        - protocols: Liste aller Protocol-Dateien
-        - resumes: Liste aller Resume-Dateien
-        - total_count: Gesamtanzahl der Dateien
-    """
+    """Liste alle gespeicherten Output-Dateien."""
     try:
         output_dir = Path("Output")
         
@@ -292,7 +459,6 @@ async def list_files():
                 "message": "Output directory does not exist yet"
             }
         
-        # Sammle alle Dateien
         protocol_files = []
         resume_files = []
         
@@ -305,18 +471,15 @@ async def list_files():
                 "modified_at": datetime.fromtimestamp(file_stat.st_mtime).isoformat()
             }
             
-            if file.name.startswith("filled_protocol_"):
-                # Extrahiere conversation_id
-                conv_id = file.name.replace("filled_protocol_", "").replace(".json", "")
+            if file.name.startswith("filled_protocol_") or file.name.startswith("protocol_"):
+                conv_id = file.name.replace("filled_protocol_", "").replace("protocol_", "").replace(".json", "")
                 file_info["conversation_id"] = conv_id
                 protocol_files.append(file_info)
             elif file.name.startswith("resume_"):
-                # Extrahiere applicant_id
                 applicant_id = file.name.replace("resume_", "").replace(".json", "")
                 file_info["applicant_id"] = applicant_id
                 resume_files.append(file_info)
         
-        # Sortiere nach Erstellungsdatum (neueste zuerst)
         protocol_files.sort(key=lambda x: x["created_at"], reverse=True)
         resume_files.sort(key=lambda x: x["created_at"], reverse=True)
         
@@ -334,24 +497,14 @@ async def list_files():
 
 @app.get("/debug/files/{filename}")
 async def get_file(filename: str):
-    """
-    Hole eine spezifische Output-Datei.
-    
-    Args:
-        filename: Name der Datei (z.B. "resume_89778.json")
-    
-    Returns:
-        JSON-Inhalt der Datei
-    """
+    """Hole eine spezifische Output-Datei."""
     try:
-        # Sicherheit: Verhindere Directory Traversal
         if ".." in filename or "/" in filename or "\\" in filename:
             raise HTTPException(
                 status_code=400,
                 detail="Invalid filename: path traversal not allowed"
             )
         
-        # Nur .json Dateien erlauben
         if not filename.endswith(".json"):
             raise HTTPException(
                 status_code=400,
@@ -366,11 +519,9 @@ async def get_file(filename: str):
                 detail=f"File not found: {filename}"
             )
         
-        # Lade und returniere Datei
         with open(file_path, 'r', encoding='utf-8') as f:
             file_content = json.load(f)
         
-        # Füge Metadaten hinzu
         file_stat = file_path.stat()
         
         return {
@@ -395,12 +546,7 @@ async def get_file(filename: str):
 
 @app.get("/debug/conversations")
 async def list_conversations():
-    """
-    Liste alle verarbeiteten Conversations mit zugehörigen Dateien.
-    
-    Returns:
-        Liste von Conversations mit Protocol + Resume
-    """
+    """Liste alle verarbeiteten Conversations mit zugehörigen Dateien."""
     try:
         output_dir = Path("Output")
         
@@ -410,31 +556,21 @@ async def list_conversations():
                 "total_count": 0
             }
         
-        # Sammle alle Protocol-Dateien (diese haben conversation_id)
         conversations = []
         
-        for protocol_file in output_dir.glob("filled_protocol_*.json"):
-            conv_id = protocol_file.name.replace("filled_protocol_", "").replace(".json", "")
+        for protocol_file in list(output_dir.glob("filled_protocol_*.json")) + list(output_dir.glob("protocol_*.json")):
+            conv_id = protocol_file.name.replace("filled_protocol_", "").replace("protocol_", "").replace(".json", "")
             
-            # Lade Protocol um applicant_id zu extrahieren
             try:
                 with open(protocol_file, 'r', encoding='utf-8') as f:
                     protocol_data = json.load(f)
                 
-                # Finde zugehöriges Resume (falls vorhanden)
                 resume_file = None
                 applicant_id = None
                 
-                # Suche in elevenlabs_metadata oder direkt im protocol
-                if "elevenlabs_metadata" in protocol_data:
-                    # Versuche applicant_id zu finden (wird nicht im protocol gespeichert)
-                    pass
-                
-                # Suche Resume-Datei durch Timestamp-Matching
                 protocol_time = protocol_file.stat().st_ctime
                 for resume in output_dir.glob("resume_*.json"):
                     resume_time = resume.stat().st_ctime
-                    # Wenn innerhalb von 5 Sekunden erstellt -> gehört zusammen
                     if abs(protocol_time - resume_time) < 5:
                         resume_file = resume.name
                         applicant_id = resume.name.replace("resume_", "").replace(".json", "")
@@ -453,7 +589,6 @@ async def list_conversations():
                 logger.warning(f"Error reading protocol {protocol_file.name}: {e}")
                 continue
         
-        # Sortiere nach Datum (neueste zuerst)
         conversations.sort(key=lambda x: x["created_at"], reverse=True)
         
         return {
@@ -467,27 +602,17 @@ async def list_conversations():
 
 
 # =============================================================================
-# KPI ENDPOINTS
+# KPI ENDPOINTS (API-Key protected)
 # =============================================================================
 
 @app.get("/api/kpis/summary")
-async def get_kpi_summary(campaign_id: Optional[str] = Query(None, description="Filter by campaign ID")):
-    """
-    Get KPI summary statistics.
-    
-    Returns metrics like:
-    - Total calls
-    - Success rate
-    - Qualification rate
-    - Average call duration
-    - Total costs
-    - Termination reasons distribution
-    """
+async def get_kpi_summary(
+    campaign_id: Optional[str] = Query(None, description="Filter by campaign ID"),
+    _auth: bool = Depends(verify_analytics_key)
+):
+    """Get KPI summary statistics."""
     if not DATABASE_ENABLED:
-        raise HTTPException(
-            status_code=503,
-            detail="Database not configured. Set DATABASE_URL environment variable."
-        )
+        raise HTTPException(status_code=503, detail="Database not configured")
     
     try:
         from database import DatabaseClient
@@ -503,18 +628,12 @@ async def get_calls(
     limit: int = Query(50, ge=1, le=500, description="Maximum number of results"),
     offset: int = Query(0, ge=0, description="Offset for pagination"),
     campaign_id: Optional[str] = Query(None, description="Filter by campaign ID"),
-    is_qualified: Optional[bool] = Query(None, description="Filter by qualification status")
+    is_qualified: Optional[bool] = Query(None, description="Filter by qualification status"),
+    _auth: bool = Depends(verify_analytics_key)
 ):
-    """
-    Get list of calls with optional filters.
-    
-    Supports pagination via limit/offset.
-    """
+    """Get list of calls with optional filters."""
     if not DATABASE_ENABLED:
-        raise HTTPException(
-            status_code=503,
-            detail="Database not configured. Set DATABASE_URL environment variable."
-        )
+        raise HTTPException(status_code=503, detail="Database not configured")
     
     try:
         from database import DatabaseClient
@@ -541,19 +660,12 @@ async def get_calls(
 
 @app.get("/api/kpis/failed-criteria")
 async def get_failed_criteria_stats(
-    campaign_id: Optional[str] = Query(None, description="Filter by campaign ID")
+    campaign_id: Optional[str] = Query(None, description="Filter by campaign ID"),
+    _auth: bool = Depends(verify_analytics_key)
 ):
-    """
-    Get statistics on which criteria fail most often.
-    
-    Returns a dictionary mapping criterion names to failure counts,
-    sorted by most common failures first.
-    """
+    """Get statistics on which criteria fail most often."""
     if not DATABASE_ENABLED:
-        raise HTTPException(
-            status_code=503,
-            detail="Database not configured. Set DATABASE_URL environment variable."
-        )
+        raise HTTPException(status_code=503, detail="Database not configured")
     
     try:
         from database import DatabaseClient
@@ -568,6 +680,78 @@ async def get_failed_criteria_stats(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# =============================================================================
+# ANALYSIS ENDPOINTS (API-Key protected)
+# =============================================================================
+
+@app.get("/api/analysis/summary")
+async def get_analysis_summary(
+    campaign_id: Optional[str] = Query(None, description="Filter by campaign ID"),
+    _auth: bool = Depends(verify_analytics_key)
+):
+    """Get aggregated analysis KPIs."""
+    if not DATABASE_ENABLED:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    
+    try:
+        from database import DatabaseClient
+        summary = await DatabaseClient.get_analysis_summary(campaign_id=campaign_id)
+        return summary
+    except Exception as e:
+        logger.error(f"Error getting analysis summary: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/analysis/hangups")
+async def get_hangup_analyses(
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    _auth: bool = Depends(verify_analytics_key)
+):
+    """Get all hangup call analyses."""
+    if not DATABASE_ENABLED:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    
+    try:
+        from database import DatabaseClient
+        analyses = await DatabaseClient.get_hangup_analyses(limit=limit, offset=offset)
+        return {
+            "analyses": analyses,
+            "count": len(analyses),
+            "limit": limit,
+            "offset": offset
+        }
+    except Exception as e:
+        logger.error(f"Error getting hangup analyses: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/analysis/conversation/{conversation_id}")
+async def get_analysis_by_conversation(
+    conversation_id: str,
+    _auth: bool = Depends(verify_analytics_key)
+):
+    """Get analysis for a specific conversation."""
+    if not DATABASE_ENABLED:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    
+    try:
+        from database import DatabaseClient
+        analysis = await DatabaseClient.get_analysis_by_conversation(conversation_id)
+        if not analysis:
+            raise HTTPException(status_code=404, detail=f"No data found for conversation {conversation_id}")
+        return analysis
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting analysis: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
+# MAIN
+# =============================================================================
+
 if __name__ == "__main__":
     import uvicorn
     
@@ -581,4 +765,3 @@ if __name__ == "__main__":
         port=port,
         reload=False  # No reload in production
     )
-

@@ -176,6 +176,10 @@ class Resume(BaseModel):
     id: int
     summary: Optional[str] = Field(default=None, description="Qualification summary (e.g. 'Bewerber qualifiziert: Alle 2 zwingenden Kriterien erfüllt.')")
     qualified: Optional[bool] = Field(default=None, description="Whether the applicant is qualified based on must-criteria (true/false)")
+    anerkennung_status: Optional[str] = Field(
+        default=None,
+        description="Status der Anerkennung ausländischer Abschlüsse: 'ja', 'in_bearbeitung', 'nein', None (nicht relevant/nicht erwähnt)"
+    )
     postal_code: Optional[str] = Field(default=None, description="Postal code / PLZ (5 digits, e.g. '10115')")
     city: Optional[str] = Field(default=None, description="City / Ort (e.g. 'Berlin', 'München')")
     preferred_contact_time: Optional[str] = None

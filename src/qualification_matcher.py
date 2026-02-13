@@ -72,6 +72,19 @@ class QualificationMatcher:
                 if prompt.answer.checked is not None and prompt.answer.confidence >= 0.7:
                     continue
                 
+                # KRITISCH: NIEMALS checked: false überschreiben
+                # Extractor hat explizit "nicht qualifiziert" entschieden
+                if prompt.answer.checked == False:
+                    continue
+                
+                # KRITISCH: NIEMALS Anerkennung-Entscheidungen überschreiben
+                # Diese sind sensible Qualifikations-Entscheidungen
+                if prompt.answer.notes:
+                    notes_lower = prompt.answer.notes.lower()
+                    anerkennung_keywords = ["anerkennung", "ausländisch", "anerkannt", "regierungspräsidium", "gleichwertigkeit"]
+                    if any(kw in notes_lower for kw in anerkennung_keywords):
+                        continue
+                
                 # Skip Info-Prompts
                 if prompt.inferred_type in [PromptType.INFO, PromptType.RECRUITER_INSTRUCTION]:
                     continue
@@ -197,11 +210,12 @@ class QualificationMatcher:
                     }
             
             # Wenn keine spezifischen Qualifikationen gesucht, aber Ausbildung vorhanden
+            # ABGESICHERT: Confidence unter threshold (0.85), um false positives zu vermeiden
             if not sought_qualifications:
                 return {
                     "checked": True,
                     "value": f"ja ({education.description})",
-                    "confidence": 0.88,
+                    "confidence": 0.70,  # Unter threshold → wird NICHT automatisch übernommen
                     "notes": f"Aus Resume: {education.description}",
                     "evidence_text": f"Ausbildung: {education.description}"
                 }

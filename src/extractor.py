@@ -118,8 +118,11 @@ Qualifikationsfragen erkennen an Keywords:
 - Ausbildung/Studium: "Haben Sie eine Ausbildung...", "Haben Sie studiert..."
 - Berufserfahrung: "Haben Sie Erfahrung...", "Wie lange arbeiten Sie..."
 - Zertifikate: "Besitzen Sie...", "Haben Sie den Nachweis..."
-- Sprachkenntnisse: "Sprechen Sie...", "Deutschkenntnisse..."
+- Sprachkenntnisse: "Sprechen Sie...", "Deutschkenntnisse...", "Deutsch B2", "B2", "C1"
 - Führerschein: "Haben Sie einen Führerschein..."
+
+⚠️ WICHTIG: Auch Fragen mit nur "Deutsch B2" (OHNE "kenntnisse") sind SPRACHFRAGEN!
+Beispiel: "zwingend: Deutsch B2" → ist eine Sprachkenntnisse-Frage!
 
 ═══════════════════════════════════════════════════════════════════
 🚨 AUSNAHME: SPRACHKENNTNISSE - STRENGE BEWERTUNG! (HÖCHSTE PRIORITÄT)
@@ -386,6 +389,33 @@ Wenn nach "B2 Deutschkenntnisse" gefragt wird:
 
 ⚠️ SPEZIALFALL: Ausländische Ausbildung/Studium
 
+🚨 KRITISCH: DURCHSUCHE DAS GESAMTE TRANSKRIPT NACH ANERKENNUNG!
+
+Bei ausländischer Ausbildung/Studium:
+1. Suche ALLE Turns nach Anerkennung-Keywords:
+   - "anerkannt", "Anerkennung", "Gleichwertigkeit", "gleichwertig"
+   - "Regierungspräsidium", "IHK", "Kultusministerium", "ZAB"
+   - "Gleichwertigkeitsbescheinigung", "Anerkennungsbescheid"
+   - Auch Kurzformen: "anerkannte", "anerkannt in Deutschland"
+   
+2. Erstelle MEHRERE Evidence-Einträge:
+   - Evidence 1: "in [Land] gemacht" (Turn X)
+   - Evidence 2: "anerkannt in Deutschland" (Turn Y) ODER
+   - Evidence 2: FEHLT → checked: false
+
+3. Wenn Anerkennung NUR erwähnt als:
+   - "beantragt", "läuft noch", "wird noch geprüft", "habe ich noch nicht"
+   → checked: false
+   → notes: "Anerkennung beantragt aber noch nicht erhalten"
+
+4. Wenn GAR KEINE Erwähnung von Anerkennung bei ausländischem Abschluss:
+   → checked: false
+   → notes: "Ausländische Ausbildung ohne Nachweis deutscher Anerkennung"
+
+5. Reglementierte Berufe (Pflege, Medizin, Lehramt, Erziehung):
+   → Anerkennung ist PFLICHT
+   → Ohne Anerkennung IMMER checked: false
+
 PRÜFE IMMER ob deutsche Anerkennung erwähnt wird!
 
 ✅ AUSLÄNDISCH MIT deutscher Anerkennung → checked: true:
@@ -399,6 +429,10 @@ PRÜFE IMMER ob deutsche Anerkennung erwähnt wird!
 │ → confidence: 0.95                                              │
 │ → notes: "Ausländische Ausbildung mit deutscher Anerkennung   │
 │          (Regierungspräsidium, 2023)"                          │
+│ → evidence: [                                                   │
+│     {span: "in der Türkei gemacht", turn_index: X, ...},       │
+│     {span: "anerkannt", turn_index: Y, ...}                    │
+│   ] (MEHRERE Evidence-Einträge!)                               │
 └────────────────────────────────────────────────────────────────┘
 
 ❌ AUSLÄNDISCH OHNE deutsche Anerkennung → checked: false:
@@ -476,12 +510,34 @@ Bei reglementierten Berufen (Pflege, Medizin, Lehramt, etc.) gilt:
 ⭐ KRITISCHE "BENEFIT OF THE DOUBT" REGELN ⭐
 ═══════════════════════════════════════════════════════════════════
 
-1. Bei Unsicherheit (60-80% sicher) → checked: true mit confidence 0.70-0.80
-2. Berufserfahrung im Bereich ≥ 1 Jahr → ZÄHLT ALS QUALIFIKATION
-3. Verwandte/ähnliche Qualifikationen → AKZEPTIEREN
-4. Praktische Erfahrung > formale Zertifikate
-5. Position/Jobtitel impliziert Kompetenz → AKZEPTIEREN
-6. Im Zweifel: lieber checked: true (niedrige confidence) als checked: null
+⚠️ ACHTUNG: Diese Regeln gelten UNTERSCHIEDLICH für Qualifikation vs. Rahmenbedingungen!
+
+🔴 FÜR QUALIFIKATIONSFRAGEN (Ausbildung, Berufserfahrung, Zertifikate):
+   → STRENGE BEWERTUNG! Nur wenn EINDEUTIG erfüllt → checked: true
+   → Im Zweifel: lieber checked: null (mit ausführlichen notes) statt checked: true
+   → NIEMALS checked: true wenn unsicher (< 80% confidence)
+   
+   Beispiele:
+   - "Habe Erfahrung in ähnlichem Bereich" → checked: null (nicht eindeutig)
+   - "War mal in der Branche tätig" → checked: null (keine klare Bestätigung)
+   - Keine Erwähnung → checked: null
+   - Explizite Verneinung → checked: false
+
+🟢 FÜR RAHMENBEDINGUNGEN (Vollzeit, Urlaub, Gehalt, Startdatum, etc.):
+   → BENEFIT OF THE DOUBT anwenden!
+   → Bei Unsicherheit (60-80% sicher) → checked: true mit confidence 0.70-0.80
+   → Im Zweifel: lieber checked: true (niedrige confidence) als checked: null
+   
+   Beispiele:
+   - "Kann ich mir vorstellen" → checked: true, confidence: 0.70
+   - "Müsste ich schauen" → checked: true, confidence: 0.65
+   - Keine Erwähnung → checked: null
+
+📊 WICHTIGE AUSNAHMEN (weiterhin großzügig):
+1. Berufserfahrung im Bereich ≥ 1 Jahr → ZÄHLT ALS QUALIFIKATION → checked: true
+2. Verwandte/ähnliche Qualifikationen mit Bezug → AKZEPTIEREN → checked: true
+3. Praktische Erfahrung + Position/Jobtitel impliziert Kompetenz → checked: true
+4. Deutsche Ausbildung ohne Anerkennung-Problematik → checked: true
 
 ✅ Durchsuche das GESAMTE Transkript - oft werden Qualifikationen zu Beginn erwähnt
 ✅ Auch Lebenslauf-Abschnitte beachten: "dann habe ich die Ausbildung bei..."
