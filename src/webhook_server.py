@@ -20,6 +20,19 @@ DATABASE_ENABLED = bool(os.getenv("DATABASE_URL"))
 # Analytics API Key
 ANALYTICS_API_KEY = os.getenv("ANALYTICS_API_KEY")
 
+# WhatsApp Fallback
+WHATSAPP_ENABLED = os.getenv("WHATSAPP_ENABLED", "false").lower() == "true"
+MIN_CALL_DURATION_FOR_PIPELINE = 120  # Calls shorter than 2 min are candidates for WhatsApp fallback
+
+# termination_reason values that indicate the candidate was not reached.
+# Extend this list as you discover new values from ElevenLabs.
+WHATSAPP_TRIGGER_REASONS = {
+    "no-answer",
+    "busy",
+    "voicemail",
+    "failed",
+}
+
 # Setup logging
 logging.basicConfig(
     level=logging.INFO,
@@ -204,6 +217,20 @@ async def process_webhook(webhook_data: Dict[str, Any], conversation_id: str):
         # Extract transcript for potential analysis
         raw_transcript = transformer.transform(webhook_data)
         
+        # =================================================================
+        # WHATSAPP FALLBACK ROUTER
+        # Check if call failed and WhatsApp fallback should be triggered
+        # =================================================================
+        if WHATSAPP_ENABLED:
+            whatsapp_triggered = await _maybe_trigger_whatsapp_fallback(
+                metadata=elevenlabs_metadata,
+                transcript=raw_transcript,
+                conversation_id=conversation_id
+            )
+            if whatsapp_triggered:
+                logger.info(f"[ROUTER] WhatsApp fallback triggered for {conversation_id}, skipping pipeline")
+                return
+        
         # Run pipeline
         result = process_elevenlabs_call(webhook_data)
         
@@ -243,10 +270,8 @@ async def process_webhook(webhook_data: Dict[str, Any], conversation_id: str):
         logger.info(f"  - Qualified: {is_qualified}")
         logger.info(f"  - Evaluation method: {evaluation_method}")
         
-        # WARNUNG bei implicit_detection (keine Qualifikationskriterien konfiguriert)
-        if "implicit_detection" in evaluation_method:
-            logger.warning("WARNUNG: Keine Qualifikationskriterien konfiguriert! "
-                         "Fallback auf implicit_detection - nahezu alle Kandidaten werden als qualifiziert eingestuft.")
+        if "no_criteria" in evaluation_method:
+            logger.info("Keine Qualifikationskriterien konfiguriert - Bewerber gilt als qualifiziert.")
         
         # Log Anerkennung-Status
         anerkennung_status = qualification.get("anerkennung_status")
@@ -377,6 +402,184 @@ async def _maybe_run_analysis(
         logger.info(f"[ANALYSIS] Saved to call_analyses: call_id={call_id}, analysis_id={analysis_id}")
     else:
         logger.warning(f"[ANALYSIS] Analysis returned None for call_id={call_id}")
+
+
+# =============================================================================
+# WHATSAPP FALLBACK ROUTER
+# =============================================================================
+
+async def _maybe_trigger_whatsapp_fallback(
+    metadata: Dict[str, Any],
+    transcript: List[Dict[str, str]],
+    conversation_id: str
+) -> bool:
+    """
+    Decide whether a failed call should trigger a WhatsApp fallback.
+    
+    Returns True if WhatsApp was triggered (caller should skip pipeline).
+    Returns False if the call should proceed through the normal pipeline.
+    
+    Detection logic:
+    1. call_successful is not "success"
+    2. Call duration very short (< MIN_CALL_DURATION_FOR_PIPELINE) with empty/minimal transcript
+    3. termination_reason matches known failure reasons
+    """
+    call_successful = metadata.get("call_successful")
+    call_duration_secs = metadata.get("call_duration_secs") or 0
+    termination_reason = (metadata.get("termination_reason") or "").lower().strip()
+    to_number = metadata.get("to_number")
+    applicant_id = metadata.get("applicant_id")
+    
+    # Need minimum data to trigger WhatsApp
+    if not to_number or not applicant_id:
+        logger.info(f"[ROUTER] No to_number or applicant_id, cannot trigger WhatsApp")
+        return False
+    
+    trigger_reason = None
+    
+    # Check 1: Explicit failure status from ElevenLabs
+    if call_successful and call_successful != "success":
+        trigger_reason = "call_not_successful"
+    
+    # Check 2: Known termination reasons indicating unreachable
+    if not trigger_reason and termination_reason in WHATSAPP_TRIGGER_REASONS:
+        trigger_reason = termination_reason
+    
+    # Check 3: Very short call with no meaningful transcript
+    # (short_call_override already catches this for qualification,
+    #  but for WhatsApp we also want to check transcript emptiness)
+    if not trigger_reason:
+        meaningful_turns = [t for t in transcript if t.get("speaker") == "A" and len(t.get("text", "")) > 5]
+        if call_duration_secs < MIN_CALL_DURATION_FOR_PIPELINE and len(meaningful_turns) == 0:
+            if call_duration_secs > 0:
+                trigger_reason = "short_call_no_response"
+    
+    if not trigger_reason:
+        return False
+    
+    logger.info(
+        f"[ROUTER] Call {conversation_id} detected as failed: "
+        f"reason={trigger_reason}, duration={call_duration_secs}s, "
+        f"termination={termination_reason}, successful={call_successful}"
+    )
+    
+    # Log the failed call to DB before triggering WhatsApp
+    if DATABASE_ENABLED:
+        try:
+            from database import DatabaseClient
+            await DatabaseClient.log_call(
+                conversation_id=conversation_id,
+                metadata=metadata,
+                is_qualified=None,
+                failed_criteria=None
+            )
+        except Exception as db_error:
+            logger.error(f"[ROUTER] DB logging error for failed call: {db_error}")
+    
+    # Trigger WhatsApp fallback
+    try:
+        from whatsapp_handler import WhatsAppHandler
+        handler = WhatsAppHandler()
+        session_id = await handler.trigger_fallback(
+            metadata=metadata,
+            trigger_reason=trigger_reason
+        )
+        
+        if session_id:
+            logger.info(f"[ROUTER] WhatsApp fallback triggered: session_id={session_id}")
+            return True
+        else:
+            logger.error(f"[ROUTER] WhatsApp fallback failed for {conversation_id}")
+            return False
+            
+    except Exception as e:
+        logger.error(f"[ROUTER] Error triggering WhatsApp fallback: {e}", exc_info=True)
+        return False
+
+
+# =============================================================================
+# WHATSAPP WEBHOOK ENDPOINT
+# =============================================================================
+
+@app.post("/whatsapp/webhook")
+async def whatsapp_incoming_webhook(request: Request):
+    """
+    Receive incoming WhatsApp messages from Twilio.
+    
+    Twilio sends POST with application/x-www-form-urlencoded, not JSON.
+    Key fields: From, Body, MessageSid, To, NumMedia
+    
+    Returns empty TwiML response (Twilio expects this).
+    """
+    try:
+        # Parse form data (Twilio sends URL-encoded, not JSON)
+        form_data = await request.form()
+        params = dict(form_data)
+        
+        from_number = params.get("From", "")
+        message_body = params.get("Body", "").strip()
+        message_sid = params.get("MessageSid", "")
+        
+        if not from_number or not message_body:
+            logger.warning(f"[WHATSAPP-WH] Empty message or missing From: {params}")
+            return _twiml_empty_response()
+        
+        logger.info(f"[WHATSAPP-WH] Incoming: from={from_number}, sid={message_sid}, body={message_body[:80]}...")
+        
+        # Validate Twilio signature (security)
+        twilio_signature = request.headers.get("X-Twilio-Signature", "")
+        if twilio_signature:
+            from twilio_client import TwilioWhatsAppClient
+            twilio = TwilioWhatsAppClient()
+            webhook_url = str(request.url)
+            if not twilio.validate_webhook_signature(webhook_url, params, twilio_signature):
+                logger.warning(f"[WHATSAPP-WH] Invalid Twilio signature from {from_number}")
+                raise HTTPException(status_code=403, detail="Invalid signature")
+        
+        # Strip "whatsapp:" prefix for DB lookup
+        clean_number = from_number.replace("whatsapp:", "")
+        
+        if not DATABASE_ENABLED:
+            logger.warning("[WHATSAPP-WH] Database not enabled, cannot process WhatsApp messages")
+            return _twiml_empty_response()
+        
+        # Find active session for this number
+        from database import DatabaseClient
+        session = await DatabaseClient.get_active_whatsapp_session(clean_number)
+        
+        if not session:
+            # Also try with whatsapp: prefix
+            session = await DatabaseClient.get_active_whatsapp_session(from_number)
+        
+        if not session:
+            logger.info(f"[WHATSAPP-WH] No active session for {from_number}, ignoring message")
+            return _twiml_empty_response()
+        
+        # Handle the incoming message
+        from whatsapp_handler import WhatsAppHandler
+        handler = WhatsAppHandler()
+        await handler.handle_incoming_message(
+            session=session,
+            message_body=message_body,
+            from_number=from_number
+        )
+        
+        return _twiml_empty_response()
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[WHATSAPP-WH] Error processing incoming message: {e}", exc_info=True)
+        return _twiml_empty_response()
+
+
+def _twiml_empty_response():
+    """Return an empty TwiML response (Twilio expects XML)."""
+    from fastapi.responses import Response
+    return Response(
+        content="<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response></Response>",
+        media_type="application/xml"
+    )
 
 
 # =============================================================================

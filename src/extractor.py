@@ -125,149 +125,6 @@ Qualifikationsfragen erkennen an Keywords:
 Beispiel: "zwingend: Deutsch B2" → ist eine Sprachkenntnisse-Frage!
 
 ═══════════════════════════════════════════════════════════════════
-🚨 AUSNAHME: SPRACHKENNTNISSE - STRENGE BEWERTUNG! (HÖCHSTE PRIORITÄT)
-═══════════════════════════════════════════════════════════════════
-
-⚠️ BEI DEUTSCHKENNTNISSEN GILT "BENEFIT OF THE DOUBT" NICHT!
-⚠️ STRENG BEWERTEN: Nur wenn explizit das geforderte Niveau erreicht ist!
-
-SPRACHKENNTNISSE-HIERARCHIE (vom niedrigsten zum höchsten):
-A1 < A2 < B1 < B2 < C1 < C2 < Muttersprache
-
-📊 QUALITATIVE DEUTSCHKENNTNISSE → CEFR-NIVEAU MAPPING:
-
-Wenn nach "B2 Deutschkenntnisse" gefragt wird:
-
-✅ MUTTERSPRACHE / SEHR FLIESSEND → C2 (≥ B2) → checked: true:
-┌────────────────────────────────────────────────────────────────┐
-│ Kandidat: "Bin Muttersprachler" / "Muttersprache Deutsch"     │
-│ Kandidat: "In Deutschland geboren und aufgewachsen"           │
-│ Kandidat: "Deutsch ist meine erste Sprache"                   │
-│                                                                │
-│ → checked: true ✅                                             │
-│ → value: "Muttersprache (C2)"                                 │
-│ → confidence: 0.98                                             │
-│ → notes: "Muttersprache Deutsch"                              │
-└────────────────────────────────────────────────────────────────┘
-
-✅ FLIESSEND / SEHR GUT → C1 (≥ B2) → checked: true:
-┌────────────────────────────────────────────────────────────────┐
-│ Kandidat: "Ich spreche fließend Deutsch"                      │
-│ Kandidat: "Sehr gut" / "Verhandlungssicher"                   │
-│ Kandidat: "Ich bin perfekt im Deutschen"                      │
-│ Kandidat: "Ohne Probleme" / "Problemlos"                      │
-│                                                                │
-│ → checked: true ✅                                             │
-│ → value: "fließend (C1)"                                      │
-│ → confidence: 0.95                                             │
-│ → notes: "Fließende Deutschkenntnisse"                        │
-└────────────────────────────────────────────────────────────────┘
-
-✅ EXPLIZIT B2, C1, C2 → checked: true:
-┌────────────────────────────────────────────────────────────────┐
-│ Kandidat: "Ich habe B2" / "B2-Niveau"                         │
-│ Kandidat: "Ich habe C1" / "C1-Zertifikat"                     │
-│                                                                │
-│ → checked: true ✅                                             │
-│ → value: "B2" / "C1"                                          │
-│ → confidence: 0.95                                             │
-│ → notes: "Niveau B2/C1 explizit bestätigt"                    │
-└────────────────────────────────────────────────────────────────┘
-
-⚠️ GUT → B2-C1 (GRENZFALL - PRÜFE KONTEXT!):
-┌────────────────────────────────────────────────────────────────┐
-│ Kandidat: "Gut" / "Gute Deutschkenntnisse"                    │
-│ Kandidat: "Ich spreche gut Deutsch"                           │
-│                                                                │
-│ PRÜFE ZUSÄTZLICHE INDIKATOREN:                                │
-│ ✅ Gespräch läuft flüssig ohne Verständigungsprobleme → B2+   │
-│ ✅ ≥3 Jahre Berufserfahrung in Deutschland → B2+              │
-│ ✅ Deutsche Ausbildung/Studium absolviert → B2+               │
-│ ✅ Komplexe Sätze, Fachbegriffe verwendet → B2+               │
-│ ❌ Kandidat korrigiert sich häufig → eher B1                  │
-│                                                                │
-│ IM ZWEIFEL: Niveau B2 annehmen (benefit of doubt)            │
-│ → checked: true ✅                                             │
-│ → value: "gut (ca. B2)"                                       │
-│ → confidence: 0.80                                             │
-│ → notes: "Qualitative Einschätzung 'gut', vermutlich B2"     │
-└────────────────────────────────────────────────────────────────┘
-
-❌ GANZ OKAY / ES GEHT → B1 (< B2) → checked: false:
-┌────────────────────────────────────────────────────────────────┐
-│ Kandidat: "Ganz okay" / "Es geht" / "Geht so"                 │
-│ Kandidat: "Ich komme zurecht" / "Einigermaßen"                │
-│                                                                │
-│ → checked: false ❌                                            │
-│ → value: "B1 (ganz okay - unter B2)"                          │
-│ → confidence: 0.85                                             │
-│ → notes: "'Ganz okay' deutet auf B1 hin, reicht nicht für B2"│
-└────────────────────────────────────────────────────────────────┘
-
-❌ EXPLIZIT A2, B1 → checked: false:
-┌────────────────────────────────────────────────────────────────┐
-│ Kandidat: "Ich habe A2" / "A2-Niveau"                         │
-│ Kandidat: "Ich habe B1" / "B1-Zertifikat"                     │
-│                                                                │
-│ → checked: false ❌                                            │
-│ → value: "A2" / "B1 (unter B2)"                               │
-│ → confidence: 0.95                                             │
-│ → notes: "Niveau A2/B1 liegt unter gefordertem B2"            │
-└────────────────────────────────────────────────────────────────┘
-
-❌ EIN BISSCHEN / GRUNDKENNTNISSE → A2 (< B2) → checked: false:
-┌────────────────────────────────────────────────────────────────┐
-│ Kandidat: "Ein bisschen" / "Grundkenntnisse"                  │
-│ Kandidat: "Ich lerne noch" / "Nicht so gut"                   │
-│ Kandidat: "Gebrochen" / "Mit Schwierigkeiten"                 │
-│                                                                │
-│ → checked: false ❌                                            │
-│ → value: "A2 (Grundkenntnisse - unter B2)"                    │
-│ → confidence: 0.92                                             │
-│ → notes: "Grundkenntnisse reichen nicht für B2"               │
-└────────────────────────────────────────────────────────────────┘
-
-❌ VAGE/UNKLAR (ohne Niveau) → checked: false:
-┌────────────────────────────────────────────────────────────────┐
-│ Kandidat: "Ja, wir reden doch gerade Deutsch"                 │
-│ Kandidat: "Ich spreche Deutsch" (Niveau nicht genannt)        │
-│ Frage wurde gar nicht gestellt                                │
-│                                                                │
-│ → checked: false ❌                                            │
-│ → value: "unklar (Niveau nicht genannt)"                      │
-│ → confidence: 0.85                                             │
-│ → notes: "Gespräch auf Deutsch ≠ B2-Nachweis, Niveau nicht   │
-│          explizit bestätigt"                                   │
-└────────────────────────────────────────────────────────────────┘
-
-🔍 ZUSÄTZLICHE KONTEXTUELLE HINWEISE FÜR "GUT":
-
-1. HERKUNFT:
-   - In Deutschland geboren → Muttersprache (C2)
-   - Seit >10 Jahren in Deutschland → wahrscheinlich ≥B2
-   - Seit 1-2 Jahren in Deutschland → eher A2-B1
-
-2. AUSBILDUNG:
-   - Deutsche Schule/Ausbildung absolviert → mindestens B2
-   - Studium auf Deutsch → mindestens C1
-   - Ausbildung im Ausland → Sprachniveau unklar
-
-3. BERUFSERFAHRUNG:
-   - >5 Jahre Arbeit in deutschsprachigem Umfeld → mindestens B2
-   - Führungsposition auf Deutsch → wahrscheinlich C1
-   - Kundenkontakt auf Deutsch → mindestens B2
-
-🚨 KRITISCHE REGELN BEI SPRACHKENNTNISSEN:
-
-1. Keine großzügige Bewertung bei Sprachkenntnissen!
-2. Wenn B2 gefordert → NUR B2/C1/C2/Muttersprache = true
-3. A2/B1 = IMMER false, auch wenn Gespräch auf Deutsch läuft
-4. "Ganz okay"/"Es geht" = false (deutet auf B1)
-5. "Ein bisschen"/"Lerne noch" = false (definitiv unter B2)
-6. Vage Aussagen ohne Niveau-Angabe = false (nicht null!)
-7. Wenn nicht explizit gefragt → checked: null (nicht false)
-
-═══════════════════════════════════════════════════════════════════
 
 ✅ checked: true → Kandidat ist QUALIFIZIERT (GROSSZÜGIG):
 
@@ -349,38 +206,26 @@ Wenn nach "B2 Deutschkenntnisse" gefragt wird:
 
 ❌ checked: false → Kandidat ist NICHT QUALIFIZIERT:
 
-  BEISPIEL 1: DEUTSCHKENNTNISSE UNTER ERFORDERTEM NIVEAU
+  BEISPIEL 1: EXPLIZITE VERNEINUNG
   ┌──────────────────────────────────────────────────────────┐
-  │ Frage: "Zwingend: Deutschkenntnisse B2"                  │
-  │ Kandidat: "Ich spreche Deutsch, aber ich lerne noch.     │
-  │            Ich habe momentan B1."                         │
+  │ Frage: "Haben Sie eine Ausbildung als Pflegefachmann?"   │
+  │ Kandidat: "Nein, das habe ich nicht."                    │
   │                                                           │
   │ → checked: false ❌                                       │
-  │ → value: "B1 (unter B2)"                                │
+  │ → value: "nein"                                          │
   │ → confidence: 0.95                                        │
-  │ → notes: "Niveau B1 liegt unter gefordertem B2"         │
+  │ → notes: "Explizite Verneinung"                          │
   └──────────────────────────────────────────────────────────┘
   
-  BEISPIEL 2: VAGE SPRACHKENNTNISSE-ANGABE
+  BEISPIEL 2: KOMPLETT ANDERE BRANCHE
   ┌──────────────────────────────────────────────────────────┐
-  │ Frage: "Zwingend: Deutschkenntnisse B2"                  │
-  │ Kandidat: "Ganz okay, ich komme zurecht."                │
+  │ Frage: "Haben Sie eine Ausbildung als Pflegefachmann?"   │
+  │ Kandidat: "Nein, ich bin IT-Spezialist."                 │
   │                                                           │
   │ → checked: false ❌                                       │
-  │ → value: "B1 (ganz okay - unter B2)"                    │
-  │ → confidence: 0.85                                        │
-  │ → notes: "'Ganz okay' deutet auf B1, reicht nicht für B2"│
-  └──────────────────────────────────────────────────────────┘
-  
-  BEISPIEL 3: NUR GRUNDKENNTNISSE
-  ┌──────────────────────────────────────────────────────────┐
-  │ Frage: "Zwingend: Deutschkenntnisse B2"                  │
-  │ Kandidat: "Ein bisschen Deutsch kann ich schon."         │
-  │                                                           │
-  │ → checked: false ❌                                       │
-  │ → value: "A2 (Grundkenntnisse - unter B2)"              │
-  │ → confidence: 0.92                                        │
-  │ → notes: "Grundkenntnisse reichen nicht für B2"         │
+  │ → value: "nein (IT-Spezialist)"                          │
+  │ → confidence: 0.95                                        │
+  │ → notes: "Komplett andere Branche"                       │
   └──────────────────────────────────────────────────────────┘
 
 ═══════════════════════════════════════════════════════════════════
@@ -507,45 +352,26 @@ Bei reglementierten Berufen (Pflege, Medizin, Lehramt, etc.) gilt:
   - ⚠️ NICHT verwenden wenn irgendwelche relevanten Infos da sind!
 
 ═══════════════════════════════════════════════════════════════════
-⭐ KRITISCHE "BENEFIT OF THE DOUBT" REGELN ⭐
+⭐ "BENEFIT OF THE DOUBT" REGELN ⭐
 ═══════════════════════════════════════════════════════════════════
 
-⚠️ ACHTUNG: Diese Regeln gelten UNTERSCHIEDLICH für Qualifikation vs. Rahmenbedingungen!
+⚠️ GRUNDPRINZIP: Im Zweifel FÜR den Kandidaten bewerten!
 
-🔴 FÜR QUALIFIKATIONSFRAGEN (Ausbildung, Berufserfahrung, Zertifikate):
-   → STRENGE BEWERTUNG! Nur wenn EINDEUTIG erfüllt → checked: true
-   → Im Zweifel: lieber checked: null (mit ausführlichen notes) statt checked: true
-   → NIEMALS checked: true wenn unsicher (< 80% confidence)
-   
-   Beispiele:
-   - "Habe Erfahrung in ähnlichem Bereich" → checked: null (nicht eindeutig)
-   - "War mal in der Branche tätig" → checked: null (keine klare Bestätigung)
-   - Keine Erwähnung → checked: null
-   - Explizite Verneinung → checked: false
-
-🟢 FÜR RAHMENBEDINGUNGEN (Vollzeit, Urlaub, Gehalt, Startdatum, etc.):
+FÜR ALLE FRAGEN (Qualifikation UND Rahmenbedingungen):
    → BENEFIT OF THE DOUBT anwenden!
-   → Bei Unsicherheit (60-80% sicher) → checked: true mit confidence 0.70-0.80
-   → Im Zweifel: lieber checked: true (niedrige confidence) als checked: null
-   
-   Beispiele:
-   - "Kann ich mir vorstellen" → checked: true, confidence: 0.70
-   - "Müsste ich schauen" → checked: true, confidence: 0.65
-   - Keine Erwähnung → checked: null
-
-📊 WICHTIGE AUSNAHMEN (weiterhin großzügig):
-1. Berufserfahrung im Bereich ≥ 1 Jahr → ZÄHLT ALS QUALIFIKATION → checked: true
-2. Verwandte/ähnliche Qualifikationen mit Bezug → AKZEPTIEREN → checked: true
-3. Praktische Erfahrung + Position/Jobtitel impliziert Kompetenz → checked: true
-4. Deutsche Ausbildung ohne Anerkennung-Problematik → checked: true
+   → Berufserfahrung im Bereich ≥ 1 Jahr → ZÄHLT ALS QUALIFIKATION → checked: true
+   → Verwandte/ähnliche Qualifikationen mit Bezug → AKZEPTIEREN → checked: true
+   → Praktische Erfahrung + Position/Jobtitel impliziert Kompetenz → checked: true
+   → Deutsche Ausbildung ohne Anerkennung-Problematik → checked: true
+   → Gespräch läuft flüssig auf Deutsch → Deutschkenntnisse ausreichend → checked: true
 
 ✅ Durchsuche das GESAMTE Transkript - oft werden Qualifikationen zu Beginn erwähnt
 ✅ Auch Lebenslauf-Abschnitte beachten: "dann habe ich die Ausbildung bei..."
 ✅ Bei Mehrfachoptionen ("A oder B oder C?"): Wenn EINE Option erfüllt → checked: true
 ✅ Äquivalente Qualifikationen akzeptieren (z.B. "Krankenpfleger" für "Pflegefachmann")
 
-❌ NUR bei KLARER Nicht-Erfüllung → checked: false
-❌ NUR bei KOMPLETTEM Fehlen → checked: null
+❌ checked: false → NUR bei KLARER Nicht-Erfüllung (explizite Verneinung)
+⚠️ checked: null → NUR bei KOMPLETTEM Fehlen (Thema gar nicht erwähnt)
 
 ═══════════════════════════════════════════════════════════════════
 MULTI-TURN REASONING FÜR QUALIFIKATIONEN (KRITISCH!)
