@@ -298,6 +298,102 @@ class HOCClient:
             "files": files
         }
     
+    async def send_failed_call_meta(
+        self,
+        conversation_id: str,
+        metadata: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Send metadata for a failed/unreached call to HOC.
+
+        Only hits /applicants/ai/call/meta so HOC can track the attempt
+        without requiring resume or transcript data.
+        """
+        if not self.api_url or not self.api_key:
+            raise ValueError("HOC API not configured (missing HIRINGS_API_URL or HIRING_API_TOKEN)")
+
+        campaign_id = metadata.get("campaign_id")
+        if not campaign_id:
+            logger.warning("[HOC-FAILED] No campaign_id in metadata, skipping failed-call meta")
+            return {"skipped": True, "reason": "no_campaign_id"}
+
+        applicant_info = {
+            "first_name": metadata.get("candidate_first_name"),
+            "last_name": metadata.get("candidate_last_name"),
+            "phone": metadata.get("to_number"),
+        }
+
+        if not applicant_info["phone"]:
+            logger.warning("[HOC-FAILED] No to_number in metadata, skipping failed-call meta")
+            return {"skipped": True, "reason": "no_phone_number"}
+
+        elevenlabs_enriched = self._enrich_elevenlabs_metadata(metadata)
+
+        duration_secs = metadata.get("call_duration_secs") or 0
+        termination_reason = metadata.get("termination_reason") or "unknown"
+
+        payload = {
+            "conversation_id": conversation_id,
+            "campaign_id": str(campaign_id),
+            "applicant": applicant_info,
+            "protocol_source": f"api_campaign_{campaign_id}",
+            "call_status": "failed",
+            "failure_reason": termination_reason,
+            "elevenlabs": elevenlabs_enriched,
+            "temporal_context": {},
+            "processing": {
+                "pipeline_skipped": True,
+                "skip_reason": "failed_call",
+                "call_duration_secs": duration_secs,
+                "termination_reason": termination_reason,
+            },
+            "files": {},
+        }
+
+        logger.info(
+            f"[HOC-FAILED] Sending failed-call meta: conversation={conversation_id}, "
+            f"campaign={campaign_id}, reason={termination_reason}, duration={duration_secs}s"
+        )
+        logger.info(f"[HOC-FAILED] Payload: {json.dumps(payload, ensure_ascii=False, default=str)}")
+
+        results = {}
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            headers = {
+                "Authorization": self.api_key,
+                "Content-Type": "application/json",
+            }
+
+            for attempt in range(3):
+                try:
+                    response = await client.post(
+                        f"{self.api_url}/applicants/ai/call/meta",
+                        json=payload,
+                        headers=headers,
+                    )
+                    response.raise_for_status()
+                    results["metadata"] = response.json()
+                    logger.info(f"[HOC-FAILED] Response: {results['metadata']}")
+                    break
+                except httpx.HTTPStatusError as e:
+                    if e.response.status_code == 404 and attempt < 2:
+                        logger.warning(
+                            f"[HOC-FAILED] Attempt {attempt + 1}/3 failed with 404, retrying in 2s..."
+                        )
+                        await asyncio.sleep(2)
+                        continue
+                    logger.error(
+                        f"[HOC-FAILED] API error: {e.response.status_code} - {e.response.text}"
+                    )
+                    results["metadata"] = {"error": str(e), "status_code": e.response.status_code}
+                    break
+                except Exception as e:
+                    logger.error(f"[HOC-FAILED] Error: {e}")
+                    results["metadata"] = {"error": str(e)}
+                    break
+
+        return results
+
     def _enrich_elevenlabs_metadata(self, elevenlabs: Dict[str, Any]) -> Dict[str, Any]:
         """
         Add formatted versions of ElevenLabs metadata.
@@ -371,3 +467,14 @@ async def send_to_hoc(data: Dict[str, Any]) -> Dict[str, Any]:
     """
     client = get_hoc_client()
     return await client.send_applicant(data)
+
+
+async def send_failed_call_to_hoc(
+    conversation_id: str,
+    metadata: Dict[str, Any]
+) -> Dict[str, Any]:
+    """
+    Send failed-call metadata to HOC so the attempt is tracked for KPIs.
+    """
+    client = get_hoc_client()
+    return await client.send_failed_call_meta(conversation_id, metadata)

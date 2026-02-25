@@ -218,18 +218,51 @@ async def process_webhook(webhook_data: Dict[str, Any], conversation_id: str):
         raw_transcript = transformer.transform(webhook_data)
         
         # =================================================================
-        # WHATSAPP FALLBACK ROUTER
-        # Check if call failed and WhatsApp fallback should be triggered
+        # FAILED-CALL DETECTION (always active, independent of WhatsApp)
+        # Gescheiterte Calls (nicht erreicht, Mailbox, etc.) überspringen
+        # die Pipeline – aber Metadaten werden trotzdem an HOC gesendet,
+        # damit Anrufversuche für KPIs erfasst werden.
         # =================================================================
-        if WHATSAPP_ENABLED:
-            whatsapp_triggered = await _maybe_trigger_whatsapp_fallback(
-                metadata=elevenlabs_metadata,
-                transcript=raw_transcript,
-                conversation_id=conversation_id
+        if _is_failed_call(metadata=elevenlabs_metadata, transcript=raw_transcript):
+            logger.info(
+                f"[ROUTER] Call {conversation_id} als gescheitert erkannt "
+                f"(nicht erreicht) – Pipeline wird übersprungen"
             )
-            if whatsapp_triggered:
-                logger.info(f"[ROUTER] WhatsApp fallback triggered for {conversation_id}, skipping pipeline")
-                return
+            
+            if DATABASE_ENABLED:
+                try:
+                    from database import DatabaseClient
+                    await DatabaseClient.log_call(
+                        conversation_id=conversation_id,
+                        metadata=elevenlabs_metadata,
+                        is_qualified=None,
+                        failed_criteria=None
+                    )
+                except Exception as db_error:
+                    logger.error(f"[ROUTER] DB logging error for failed call: {db_error}")
+            
+            if os.getenv("HIRINGS_API_URL") and os.getenv("HIRING_API_TOKEN"):
+                try:
+                    from hoc_client import send_failed_call_to_hoc
+                    hoc_response = await send_failed_call_to_hoc(
+                        conversation_id=conversation_id,
+                        metadata=elevenlabs_metadata
+                    )
+                    logger.info(f"[ROUTER] HOC failed-call meta sent: {hoc_response}")
+                except Exception as hoc_error:
+                    logger.error(f"[ROUTER] HOC meta error for failed call: {hoc_error}", exc_info=True)
+            
+            if WHATSAPP_ENABLED:
+                try:
+                    await _maybe_trigger_whatsapp_fallback(
+                        metadata=elevenlabs_metadata,
+                        transcript=raw_transcript,
+                        conversation_id=conversation_id
+                    )
+                except Exception as wa_error:
+                    logger.error(f"[ROUTER] WhatsApp fallback error: {wa_error}", exc_info=True)
+            
+            return
         
         # Run pipeline
         result = process_elevenlabs_call(webhook_data)
@@ -270,8 +303,24 @@ async def process_webhook(webhook_data: Dict[str, Any], conversation_id: str):
         logger.info(f"  - Qualified: {is_qualified}")
         logger.info(f"  - Evaluation method: {evaluation_method}")
         
-        if "no_criteria" in evaluation_method:
-            logger.info("Keine Qualifikationskriterien konfiguriert - Bewerber gilt als qualifiziert.")
+        # Safeguard: no_criteria + leeres Transkript → is_qualified = None
+        if "no_criteria" in evaluation_method and is_qualified is True:
+            meaningful_turns = [
+                t for t in raw_transcript
+                if t.get("speaker") == "A" and len(t.get("text", "")) > 5
+            ]
+            if len(meaningful_turns) == 0:
+                logger.warning(
+                    f"  - Keine Kriterien + leeres Transkript: "
+                    f"is_qualified wird auf None gesetzt (statt True)"
+                )
+                is_qualified = None
+                evaluation_method = f"{evaluation_method}+empty_transcript_override"
+                if "qualification" in result:
+                    result["qualification"]["is_qualified"] = None
+                    result["qualification"]["evaluation_method"] = evaluation_method
+            else:
+                logger.info("Keine Qualifikationskriterien konfiguriert - Bewerber gilt als qualifiziert.")
         
         # Log Anerkennung-Status
         anerkennung_status = qualification.get("anerkennung_status")
@@ -402,6 +451,57 @@ async def _maybe_run_analysis(
         logger.info(f"[ANALYSIS] Saved to call_analyses: call_id={call_id}, analysis_id={analysis_id}")
     else:
         logger.warning(f"[ANALYSIS] Analysis returned None for call_id={call_id}")
+
+
+# =============================================================================
+# FAILED-CALL DETECTION
+# =============================================================================
+
+def _is_failed_call(
+    metadata: Dict[str, Any],
+    transcript: List[Dict[str, str]]
+) -> bool:
+    """
+    Detect if a call failed (candidate was not reached).
+    
+    This check runs ALWAYS, independent of WHATSAPP_ENABLED.
+    Failed calls skip the pipeline (no resume/protocol) but still send
+    call metadata to HOC via /applicants/ai/call/meta for KPI tracking.
+    
+    Detection criteria (any one is sufficient):
+    1. call_successful is explicitly not "success"
+    2. termination_reason matches known failure reasons
+    3. Completely empty transcript (0 turns)
+    4. Very short call (< 2 min) with no meaningful applicant responses
+    """
+    call_successful = metadata.get("call_successful")
+    call_duration_secs = metadata.get("call_duration_secs") or 0
+    termination_reason = (metadata.get("termination_reason") or "").lower().strip()
+    
+    if call_successful and call_successful != "success":
+        logger.info(f"[FAILED-CALL] call_successful={call_successful}")
+        return True
+    
+    if termination_reason in WHATSAPP_TRIGGER_REASONS:
+        logger.info(f"[FAILED-CALL] termination_reason={termination_reason}")
+        return True
+    
+    if len(transcript) == 0:
+        logger.info("[FAILED-CALL] Transkript komplett leer (0 Turns)")
+        return True
+    
+    meaningful_turns = [
+        t for t in transcript
+        if t.get("speaker") == "A" and len(t.get("text", "")) > 5
+    ]
+    if call_duration_secs < MIN_CALL_DURATION_FOR_PIPELINE and len(meaningful_turns) == 0:
+        logger.info(
+            f"[FAILED-CALL] Kurzer Call ({call_duration_secs}s) ohne "
+            f"aussagekräftige Bewerber-Antworten"
+        )
+        return True
+    
+    return False
 
 
 # =============================================================================
