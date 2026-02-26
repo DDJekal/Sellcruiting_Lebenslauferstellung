@@ -167,19 +167,13 @@ def process_elevenlabs_call(webhook_data: Dict[str, Any]) -> Dict[str, Any]:
         temporal_context=temporal_context
     )
     
-    # NEUE STUFE: Enrich protocol with resume data (Smart Matching)
-    # Skip matcher for API protocols - agent asked everything directly
-    is_api_protocol = protocol_source.startswith("api_")
-    
-    if not is_api_protocol:
-        logger.info("Enriching protocol with resume data (Smart Matching)...")
-        filled_protocol = qualification_matcher.enrich_protocol_with_resume(
-            filled_protocol=filled_protocol,
-            resume=applicant_resume.resume,
-            confidence_threshold=0.85
-        )
-    else:
-        logger.info("Skipping QualificationMatcher (API protocol -- agent asked everything)")
+    # Enrich protocol with resume data (Smart Matching)
+    logger.info("Enriching protocol with resume data (Smart Matching)...")
+    filled_protocol = qualification_matcher.enrich_protocol_with_resume(
+        filled_protocol=filled_protocol,
+        resume=applicant_resume.resume,
+        confidence_threshold=0.90
+    )
     
     # Apply routing rules (implicit defaults REMOVED - no longer used)
     # filled_protocol = validator.apply_implicit_defaults(filled_protocol, mandanten_config)
