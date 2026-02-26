@@ -1,6 +1,7 @@
 """FastAPI Webhook Server for ElevenLabs → Processing Pipeline → HOC."""
 import os
 import json
+import asyncio
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -264,8 +265,9 @@ async def process_webhook(webhook_data: Dict[str, Any], conversation_id: str):
             
             return
         
-        # Run pipeline
-        result = process_elevenlabs_call(webhook_data)
+        # Run pipeline in thread to avoid blocking the event loop
+        # (keeps /health responsive during LLM calls)
+        result = await asyncio.to_thread(process_elevenlabs_call, webhook_data)
         
         logger.info(f"Pipeline completed: Applicant ID {result['applicant_id']}")
         logger.info(f"  - Experiences: {result['experiences_count']}")
