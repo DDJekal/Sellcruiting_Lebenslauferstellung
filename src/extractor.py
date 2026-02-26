@@ -111,8 +111,8 @@ AUFGABE:
 REGELN FÜR QUALIFIKATIONSFRAGEN (HÖCHSTE PRIORITÄT)
 ═══════════════════════════════════════════════════════════════════
 
-⚠️ GRUNDPRINZIP: "BENEFIT OF THE DOUBT" - Im Zweifel FÜR den Kandidaten!
-⚠️ GROSSZÜGIG BEWERTEN: Berufserfahrung im Bereich = Qualifikation!
+⚠️ GRUNDPRINZIP: STRIKTE AUSWERTUNG - Nur explizite Bestätigungen zählen!
+⚠️ WICHTIG: Berufserfahrung ist NICHT gleich formale Ausbildung!
 
 Qualifikationsfragen erkennen an Keywords:
 - Ausbildung/Studium: "Haben Sie eine Ausbildung...", "Haben Sie studiert..."
@@ -126,7 +126,7 @@ Beispiel: "zwingend: Deutsch B2" → ist eine Sprachkenntnisse-Frage!
 
 ═══════════════════════════════════════════════════════════════════
 
-✅ checked: true → Kandidat ist QUALIFIZIERT (GROSSZÜGIG):
+✅ checked: true → NUR bei EXPLIZITER Bestätigung:
 
   1. DIREKTE BESTÄTIGUNG (confidence: 0.95-1.0):
   ┌──────────────────────────────────────────────────────────┐
@@ -136,77 +136,17 @@ Beispiel: "zwingend: Deutsch B2" → ist eine Sprachkenntnisse-Frage!
   │ → checked: true, value: "ja", confidence: 0.95           │
   └──────────────────────────────────────────────────────────┘
   
-  2. BERUFSERFAHRUNG IM BEREICH = QUALIFIKATION ⭐ (confidence: 0.80-0.90):
+  2. BESTÄTIGUNG MIT DETAILS (confidence: 0.95-1.0):
   ┌──────────────────────────────────────────────────────────┐
   │ Frage: "Haben Sie eine Ausbildung als Pflegefachmann?"   │
-  │ Kandidat: "Ich arbeite seit 7 Jahren in der Pflege auf   │
-  │            der Intensivstation."                          │
-  │                                                           │
-  │ → checked: true ✅                                        │
-  │ → value: "7 Jahre Berufserfahrung Intensivstation"      │
-  │ → confidence: 0.85                                        │
-  │ → notes: "Qualifiziert durch langjährige Berufserfahrung"│
-  └──────────────────────────────────────────────────────────┘
-  
-  3. PRAKTISCHE TÄTIGKEIT = QUALIFIKATION ⭐ (confidence: 0.75-0.85):
-  ┌──────────────────────────────────────────────────────────┐
-  │ Frage: "Haben Sie Erfahrung in der Altenpflege?"         │
-  │ Kandidat: "Ich habe 2 Jahre in einem Altenheim          │
-  │            gearbeitet."                                   │
-  │                                                           │
-  │ → checked: true ✅                                        │
-  │ → value: "2 Jahre Altenheim"                            │
-  │ → confidence: 0.80                                        │
-  │ → notes: "Qualifiziert durch praktische Erfahrung"      │
-  └──────────────────────────────────────────────────────────┘
-  
-  4. ÄQUIVALENTE QUALIFIKATION (confidence: 0.85-0.92):
-  ┌──────────────────────────────────────────────────────────┐
-  │ Frage: "Haben Sie eine Ausbildung als Pflegefachmann?"   │
-  │ Kandidat: "Ich bin ausgebildeter Gesundheits- und        │
-  │            Krankenpfleger."                               │
-  │ → checked: true, value: "Gesundheits- und Kranken-       │
-  │                          pfleger", confidence: 0.90       │
-  │ → notes: "Äquivalente Qualifikation im Pflegebereich"    │
-  └──────────────────────────────────────────────────────────┘
-  
-  5. VERWANDTE QUALIFIKATION ⭐ (confidence: 0.75-0.85):
-  ┌──────────────────────────────────────────────────────────┐
-  │ Frage: "Haben Sie eine Ausbildung als Koch?"             │
-  │ Kandidat: "Ich bin Restaurantfachmann und habe 3 Jahre   │
-  │            in der Küche gearbeitet."                      │
-  │                                                           │
-  │ → checked: true ✅                                        │
-  │ → value: "Restaurantfachmann mit 3 Jahren Küchenerfahrung"│
-  │ → confidence: 0.80                                        │
-  │ → notes: "Verwandte Qualifikation im Gastro-Bereich"    │
-  └──────────────────────────────────────────────────────────┘
-  
-  6. IMPLIZITE KOMPETENZ DURCH POSITION (confidence: 0.75-0.85):
-  ┌──────────────────────────────────────────────────────────┐
-  │ Frage: "Haben Sie Führungserfahrung?"                    │
-  │ Kandidat: "Ich war 5 Jahre stellvertretender Leiter      │
-  │            der Abteilung."                                │
-  │                                                           │
-  │ → checked: true ✅                                        │
-  │ → value: "5 Jahre stellv. Leitung"                      │
-  │ → confidence: 0.82                                        │
-  │ → notes: "Position impliziert Führungsverantwortung"    │
-  └──────────────────────────────────────────────────────────┘
-  
-  7. BEILÄUFIGE ERWÄHNUNG im Lebenslauf (confidence: 0.75-0.88):
-  ┌──────────────────────────────────────────────────────────┐
-  │ Frage: "Haben Sie eine Ausbildung als Pflegefachmann?"   │
-  │ Kandidat (früher im Gespräch): "...dann habe ich 2020    │
-  │           meine Ausbildung zum Pflegefachmann fertig      │
-  │           gemacht..."                                     │
-  │ → checked: true, value: "ja (2020)", confidence: 0.85    │
-  │ → notes: "Beiläufig im Lebenslauf erwähnt"               │
+  │ Kandidat: "Ja, 2020 abgeschlossen in Nürnberg."          │
+  │ → checked: true, value: "ja (2020, Nürnberg)"           │
+  │ → confidence: 0.98                                        │
   └──────────────────────────────────────────────────────────┘
 
-❌ checked: false → Kandidat ist NICHT QUALIFIZIERT:
+❌ checked: false → Bei Verneinung oder anderer Qualifikation:
 
-  BEISPIEL 1: EXPLIZITE VERNEINUNG
+  1. EXPLIZITE VERNEINUNG (confidence: 0.95-1.0):
   ┌──────────────────────────────────────────────────────────┐
   │ Frage: "Haben Sie eine Ausbildung als Pflegefachmann?"   │
   │ Kandidat: "Nein, das habe ich nicht."                    │
@@ -217,7 +157,32 @@ Beispiel: "zwingend: Deutsch B2" → ist eine Sprachkenntnisse-Frage!
   │ → notes: "Explizite Verneinung"                          │
   └──────────────────────────────────────────────────────────┘
   
-  BEISPIEL 2: KOMPLETT ANDERE BRANCHE
+  2. BERUFSERFAHRUNG OHNE FORMALE AUSBILDUNG (confidence: 0.85-0.90):
+  ┌──────────────────────────────────────────────────────────┐
+  │ Frage: "Haben Sie eine Ausbildung als Pflegefachmann?"   │
+  │ Kandidat: "Nein, aber ich arbeite seit 7 Jahren in der   │
+  │            Pflege."                                       │
+  │                                                           │
+  │ → checked: false ❌                                       │
+  │ → value: "nein (7 Jahre Berufserfahrung, keine formale   │
+  │            Ausbildung)"                                   │
+  │ → confidence: 0.90                                        │
+  │ → notes: "Berufserfahrung vorhanden, aber keine formale  │
+  │          Ausbildung"                                      │
+  └──────────────────────────────────────────────────────────┘
+  
+  3. ANDERE QUALIFIKATION (confidence: 0.85-0.92):
+  ┌──────────────────────────────────────────────────────────┐
+  │ Frage: "Haben Sie eine Ausbildung als Pflegefachmann?"   │
+  │ Kandidat: "Nein, ich bin Altenpfleger."                  │
+  │                                                           │
+  │ → checked: false ❌                                       │
+  │ → value: "nein (Altenpfleger)"                           │
+  │ → confidence: 0.90                                        │
+  │ → notes: "Andere Qualifikation: Altenpfleger"            │
+  └──────────────────────────────────────────────────────────┘
+  
+  4. KOMPLETT ANDERE BRANCHE (confidence: 0.95-1.0):
   ┌──────────────────────────────────────────────────────────┐
   │ Frage: "Haben Sie eine Ausbildung als Pflegefachmann?"   │
   │ Kandidat: "Nein, ich bin IT-Spezialist."                 │
@@ -226,6 +191,19 @@ Beispiel: "zwingend: Deutsch B2" → ist eine Sprachkenntnisse-Frage!
   │ → value: "nein (IT-Spezialist)"                          │
   │ → confidence: 0.95                                        │
   │ → notes: "Komplett andere Branche"                       │
+  └──────────────────────────────────────────────────────────┘
+
+⚠️ checked: null → Wenn nicht klar angesprochen:
+
+  BEISPIEL: THEMA NICHT ERWÄHNT
+  ┌──────────────────────────────────────────────────────────┐
+  │ Frage: "Haben Sie Fortbildungen besucht?"                │
+  │ Transkript: [Thema Fortbildungen wird nicht erwähnt]     │
+  │                                                           │
+  │ → checked: null                                           │
+  │ → value: null                                             │
+  │ → confidence: 0.0                                         │
+  │ → notes: "Nicht im Gespräch angesprochen"                │
   └──────────────────────────────────────────────────────────┘
 
 ═══════════════════════════════════════════════════════════════════
@@ -352,28 +330,6 @@ Bei reglementierten Berufen (Pflege, Medizin, Lehramt, etc.) gilt:
   - ⚠️ NICHT verwenden wenn irgendwelche relevanten Infos da sind!
 
 ═══════════════════════════════════════════════════════════════════
-⭐ "BENEFIT OF THE DOUBT" REGELN ⭐
-═══════════════════════════════════════════════════════════════════
-
-⚠️ GRUNDPRINZIP: Im Zweifel FÜR den Kandidaten bewerten!
-
-FÜR ALLE FRAGEN (Qualifikation UND Rahmenbedingungen):
-   → BENEFIT OF THE DOUBT anwenden!
-   → Berufserfahrung im Bereich ≥ 1 Jahr → ZÄHLT ALS QUALIFIKATION → checked: true
-   → Verwandte/ähnliche Qualifikationen mit Bezug → AKZEPTIEREN → checked: true
-   → Praktische Erfahrung + Position/Jobtitel impliziert Kompetenz → checked: true
-   → Deutsche Ausbildung ohne Anerkennung-Problematik → checked: true
-   → Gespräch läuft flüssig auf Deutsch → Deutschkenntnisse ausreichend → checked: true
-
-✅ Durchsuche das GESAMTE Transkript - oft werden Qualifikationen zu Beginn erwähnt
-✅ Auch Lebenslauf-Abschnitte beachten: "dann habe ich die Ausbildung bei..."
-✅ Bei Mehrfachoptionen ("A oder B oder C?"): Wenn EINE Option erfüllt → checked: true
-✅ Äquivalente Qualifikationen akzeptieren (z.B. "Krankenpfleger" für "Pflegefachmann")
-
-❌ checked: false → NUR bei KLARER Nicht-Erfüllung (explizite Verneinung)
-⚠️ checked: null → NUR bei KOMPLETTEM Fehlen (Thema gar nicht erwähnt)
-
-═══════════════════════════════════════════════════════════════════
 MULTI-TURN REASONING FÜR QUALIFIKATIONEN (KRITISCH!)
 ═══════════════════════════════════════════════════════════════════
 
@@ -409,89 +365,6 @@ REGELN:
 ✅ IMMER: Alle relevanten Turns zu einer Gesamtaussage kombinieren
 
 ═══════════════════════════════════════════════════════════════════
-SYNONYM-ERKENNUNG FÜR QUALIFIKATIONEN (ERWEITERT!)
-═══════════════════════════════════════════════════════════════════
-
-⚠️ WICHTIG: Akzeptiere ÄQUIVALENTE und VERWANDTE Qualifikationen!
-
-PFLEGEBEREICH - Alle äquivalent:
-- Pflegefachmann/-frau
-- Gesundheits- und Krankenpfleger/in
-- Krankenpfleger/in, Krankenschwester
-- Altenpfleger/in
-- Kinderkrankenpfleger/in
-- Pflegefachkraft (staatlich anerkannt)
-- Examinierte/r Krankenpfleger/in
-
-ELEKTROTECHNIK - Alle äquivalent:
-- Bachelor/Master Elektrotechnik
-- Dipl.-Ing. Elektrotechnik
-- Elektroingenieur/in
-- Elektrotechniker/in (mit Techniker-Abschluss)
-
-PÄDAGOGIK - Alle äquivalent:
-- Erzieher/in (staatlich anerkannt)
-- Sozialpädagoge/in
-- Kinderpädagoge/in
-- Pädagogische Fachkraft
-- Kindergärtner/in
-- Elementarpädagoge/in
-
-IT-BEREICH - Alle äquivalent:
-- Fachinformatiker (Systemintegration/Anwendungsentwicklung)
-- IT-Systemelektroniker
-- Informatiker/in
-- Software-Entwickler/in
-
-GASTRONOMIE - Verwandt/äquivalent:
-- Koch/Köchin
-- Restaurantfachmann/-frau (mit Küchenerfahrung!)
-- Hotelfachmann/-frau (mit Küchenerfahrung!)
-
-✅ REGEL: Wenn Kandidat verwandte Qualifikation nennt:
-   → checked: true
-   → value: "[Genannte Qualifikation]"
-   → confidence: 0.85-0.92
-   → notes: "Aequivalente/Verwandte Qualifikation im [Bereich]"
-
-═══════════════════════════════════════════════════════════════════
-NEGATIVE QUALIFIKATIONEN PRÄZISE ERKENNEN (NEU!)
-═══════════════════════════════════════════════════════════════════
-
-❌ checked: false → Bei expliziter ODER impliziter Verneinung:
-
-1. EXPLIZITE VERNEINUNG (confidence: 0.90-0.95):
-   - "Nein, das habe ich nicht"
-   - "Ich habe keine Ausbildung als..."
-   - "Das kann ich leider nicht"
-   - "Darin bin ich nicht ausgebildet"
-
-2. IMPLIZITE VERNEINUNG (confidence: 0.75-0.85):
-   - "Ich habe keine formale Ausbildung, aber..."
-     → checked: false (formal), aber prüfe "aber"-Teil!
-   
-   - "Das liegt mir nicht so"
-     → checked: false, confidence: 0.80
-   
-   - "Da bin ich noch unsicher / unerfahren"
-     → checked: false, confidence: 0.75
-   
-   - "Das müsste ich noch lernen"
-     → checked: false, confidence: 0.80
-
-3. VORSICHTIGE VERNEINUNG - PRÜFE KOMPENSATION (confidence: variabel):
-   - "Nicht direkt, aber ich habe 5 Jahre Erfahrung"
-     → Erfahrung kompensiert? → checked: true, confidence: 0.78
-   
-   - "So richtig nicht, aber ich mache das seit 3 Jahren"
-     → Praktische Erfahrung kompensiert → checked: true, confidence: 0.75
-   
-   - "Nicht offiziell, aber..."
-     → Prüfe ob informelle Qualifikation ausreicht!
-
-⚠️ WICHTIG: Bei "aber" → Prüfe ob das Folgende die fehlende formale Qualifikation kompensiert!
-
-═══════════════════════════════════════════════════════════════════
 CONFIDENCE-SCORE KALIBRIERUNG (PRÄZISE!)
 ═══════════════════════════════════════════════════════════════════
 
@@ -504,31 +377,21 @@ confidence: 0.95-1.0 (SEHR HOCH - Eindeutige Bestätigung):
 └─ Mehrfache Bestätigung im Transkript
 
 confidence: 0.85-0.94 (HOCH - Starke Indizien):
-├─ Aequivalente Qualifikation eindeutig benannt
-├─ Lange Berufserfahrung (>=5 Jahre) im exakten Bereich
-├─ Position eindeutig, die formale Qualifikation erfordert
-└─ Institution/Arbeitgeber nennt, die Qualifikation voraussetzt
+├─ Explizite Bestätigung ohne Jahr/Details
+├─ Mehrere Evidence-Einträge aus verschiedenen Turns
+└─ Institution/Arbeitgeber genannt
 
-confidence: 0.75-0.84 (MITTEL-HOCH - Wahrscheinlich qualifiziert):
-├─ Verwandte Qualifikation mit Bezug
-├─ Berufserfahrung 2-4 Jahre im Bereich
-├─ Praktische Tätigkeit mit konkreten Details
-└─ Selbstständige Arbeit in dem Bereich
+confidence: 0.75-0.84 (MITTEL-HOCH - Implizite Verneinung):
+├─ "Nein, aber..." mit Alternativ-Qualifikation
+├─ Andere Qualifikation genannt
+└─ Ausländische Ausbildung ohne Anerkennung
 
-confidence: 0.65-0.74 (MITTEL - Möglicherweise qualifiziert):
-├─ Beiläufige Erwähnung ohne Details
-├─ Kurze Erfahrung (1-2 Jahre)
-├─ Quereinsteiger mit Bezug
-└─ Selbstlernen mit Nachweis (Portfolio/Projekte)
+confidence: 0.90-0.95 (SEHR HOCH - Eindeutige Verneinung):
+├─ Explizite Verneinung ohne Alternativen
+├─ Komplett andere Branche
+└─ "Nein, das habe ich nicht"
 
-confidence: 0.50-0.64 (NIEDRIG - Unsicher, aber möglich):
-├─ Sehr vage Angaben
-├─ Indirekte Hinweise
-├─ Kombination mehrerer schwacher Signale
-└─ "Habe mich damit beschäftigt" ohne Nachweis
-
-⚠️ NIEMALS confidence < 0.50 bei checked: true!
-⚠️ Bei confidence < 0.65 → Immer ausführliche notes mit Begründung!
+⚠️ Bei confidence < 0.90 → Immer ausführliche notes mit Begründung!
 
 
 ═══════════════════════════════════════════════════════════════════

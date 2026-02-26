@@ -482,8 +482,14 @@ def _is_failed_call(
         logger.info(f"[FAILED-CALL] call_successful={call_successful}")
         return True
     
+    # Exakter Match
     if termination_reason in WHATSAPP_TRIGGER_REASONS:
         logger.info(f"[FAILED-CALL] termination_reason={termination_reason}")
+        return True
+    
+    # Substring-Match für Varianten wie "voicemail_detection tool was called."
+    if any(reason in termination_reason for reason in WHATSAPP_TRIGGER_REASONS):
+        logger.info(f"[FAILED-CALL] termination_reason contains: {termination_reason}")
         return True
     
     if len(transcript) == 0:
