@@ -171,14 +171,16 @@ class HOCClient:
         protocol = data.get("protocol_minimal", data.get("protocol", {}))
         campaign_id = data.get("campaign_id")
         applicant_data = data.get("applicant", {})
+        original_applicant_id = data.get("metadata", {}).get("elevenlabs", {}).get("applicant_id")
         
         return {
             "campaign_id": str(campaign_id) if campaign_id else "",
             "conversation_id": data.get("conversation_id"),
             "applicant": {
+                "id": original_applicant_id,
                 "first_name": applicant_data.get("first_name"),
                 "last_name": applicant_data.get("last_name"),
-                "phone": applicant_data.get("phone")
+                "phone": applicant_data.get("phone"),
             },
             "pages": protocol.get("pages", [])
         }
@@ -219,9 +221,11 @@ class HOCClient:
         applicant = data.get("applicant", {}).copy()
         resume = data.get("resume", {}).copy()
         campaign_id = data.get("campaign_id")
+        original_applicant_id = data.get("metadata", {}).get("elevenlabs", {}).get("applicant_id")
         
-        # WICHTIG: applicant.id NICHT senden - HOC API erstellt/findet Applicant!
+        # Hash-generierte ID entfernen, originale Bewerber-ID aus HOC durchreichen
         applicant.pop("id", None)
+        applicant["id"] = original_applicant_id
         
         # WICHTIG: resume.id und applicant_id NICHT senden - HOC API setzt automatisch!
         resume.pop("id", None)
@@ -274,6 +278,7 @@ class HOCClient:
         processing = metadata.get("processing", {})
         files = metadata.get("files", {})
         applicant_data = data.get("applicant", {})
+        original_applicant_id = elevenlabs.get("applicant_id")
         
         # Enrich elevenlabs with formatted values
         elevenlabs_enriched = self._enrich_elevenlabs_metadata(elevenlabs)
@@ -287,9 +292,10 @@ class HOCClient:
             "conversation_id": data.get("conversation_id"),
             "campaign_id": str(campaign_id) if campaign_id else "",
             "applicant": {
+                "id": original_applicant_id,
                 "first_name": applicant_data.get("first_name"),
                 "last_name": applicant_data.get("last_name"),
-                "phone": applicant_data.get("phone")
+                "phone": applicant_data.get("phone"),
             },
             "protocol_source": data.get("protocol_source", f"api_campaign_{campaign_id}"),
             "elevenlabs": elevenlabs_enriched,
@@ -318,6 +324,7 @@ class HOCClient:
             return {"skipped": True, "reason": "no_campaign_id"}
 
         applicant_info = {
+            "id": metadata.get("applicant_id"),
             "first_name": metadata.get("candidate_first_name"),
             "last_name": metadata.get("candidate_last_name"),
             "phone": metadata.get("to_number"),
