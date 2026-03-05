@@ -16,6 +16,7 @@ from mapper import Mapper
 from validator import Validator
 from resume_builder import ResumeBuilder
 from qualification_matcher import QualificationMatcher
+from qualification_verifier import QualificationVerifier
 from questionnaire_client import QuestionnaireClient
 from questionnaire_transformer import QuestionnaireTransformer
 from models import MandantenConfig
@@ -178,7 +179,25 @@ def process_elevenlabs_call(webhook_data: Dict[str, Any]) -> Dict[str, Any]:
     # Apply routing rules (implicit defaults REMOVED - no longer used)
     # filled_protocol = validator.apply_implicit_defaults(filled_protocol, mandanten_config)
     filled_protocol = validator.apply_routing_rules(filled_protocol, mandanten_config)
-    
+
+    # Qualification Verifier: fokussierter Prompt-2 Check pro Kriteriengruppe.
+    # Ergebnisse ueberschreiben die Extractor-Antworten fuer Qualifikations-Prompts.
+    if mandanten_config.qualification_groups:
+        logger.info("Starte Qualification Verifier (Prompt-2)...")
+        qualification_verifier = QualificationVerifier()
+        verified_answers = qualification_verifier.verify_criteria(
+            mandanten_config.qualification_groups,
+            transcript,
+        )
+        if verified_answers:
+            prompts_overridden = 0
+            for page in filled_protocol.pages:
+                for prompt in page.prompts:
+                    if prompt.id in verified_answers:
+                        prompt.answer = verified_answers[prompt.id]
+                        prompts_overridden += 1
+            logger.info(f"Qualification Verifier: {prompts_overridden} Prompts ueberschrieben")
+
     # Evaluate qualification (jetzt mit enriched protocol + Anerkennung!)
     qualification_evaluation = validator.evaluate_qualification(
         filled_protocol, 

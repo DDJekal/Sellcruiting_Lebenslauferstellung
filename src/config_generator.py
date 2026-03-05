@@ -1,33 +1,46 @@
 """Automatic config generator for creating mandanten YAML files from protocol templates."""
 import re
-from typing import Dict, Any, List
+import os
+import logging
+from typing import Dict, Any, List, Optional
 from pathlib import Path
 import yaml
 
 from models import PromptType
 
+logger = logging.getLogger(__name__)
+
 
 class ConfigGenerator:
     """Generates mandanten configuration YAML from protocol template."""
-    
+
     def generate_config(
         self,
         protocol: Dict[str, Any],
-        output_path: str = None
+        output_path: str = None,
+        use_llm: bool = True,
     ) -> Dict[str, Any]:
         """
         Generate configuration from protocol template.
-        
+
+        Qualifikationskriterien werden prompt-basiert per LLM identifiziert
+        (use_llm=True, Standard). Fallback auf deterministischen Modus wenn
+        LLM nicht verfuegbar oder use_llm=False gesetzt ist.
+
         Args:
             protocol: Protocol template (JSON dict)
             output_path: Optional path to write YAML file
-            
+            use_llm: True = LLM-basierte Kriterien-Erkennung (Standard)
+
         Returns:
             Config dict that can be written to YAML
         """
         template_id = protocol.get("id")
         template_name = protocol.get("name", "Unknown")
-        
+
+        # Qualifikationskriterien: LLM (bevorzugt) oder deterministisch (Fallback)
+        must_criteria, qualification_groups = self._extract_criteria(protocol, use_llm)
+
         # Initialize config structure
         config = {
             "mandant_id": f"template_{template_id}",
@@ -36,44 +49,82 @@ class ConfigGenerator:
             "info_page_names": self._extract_info_page_names(protocol),
             "grounding": self._extract_grounding_defaults(protocol),
             "aida_phase_mapping": self._generate_aida_mapping(protocol),
-            "must_criteria": self._extract_must_criteria(protocol),
-            "qualification_groups": self._extract_qualification_groups(protocol),  # Neu
-            "routing_rules": [],  # Empty by default, user can add manually
-            "implicit_defaults": self._generate_implicit_defaults(protocol)
+            "must_criteria": must_criteria,
+            "qualification_groups": qualification_groups,
+            "routing_rules": [],
+            "implicit_defaults": self._generate_implicit_defaults(protocol),
         }
-        
+
         # WARNUNG bei leerer Qualifikationskonfiguration
         has_must_criteria = len(config["must_criteria"]) > 0
         has_qual_groups = len(config["qualification_groups"]) > 0
-        
+
         if not has_must_criteria and not has_qual_groups:
-            import logging
-            logging.warning(f"⚠️ WARNUNG: Template {template_id} hat KEINE Qualifikationskriterien! "
-                          f"Alle Kandidaten werden als qualifiziert eingestuft (implicit_detection).")
+            logger.warning(
+                f"WARNUNG: Template {template_id} hat KEINE Qualifikationskriterien! "
+                f"Alle Kandidaten werden als qualifiziert eingestuft."
+            )
         
         # Write to file if path provided
         if output_path:
             output_file = Path(output_path)
             output_file.parent.mkdir(parents=True, exist_ok=True)
-            
+
             with open(output_file, "w", encoding="utf-8") as f:
-                # Add header comment
                 f.write(f"# Auto-generated config for: {template_name}\n")
                 f.write(f"# Template ID: {template_id}\n")
                 f.write(f"# Generated from protocol template\n")
-                
-                # WARNUNG bei leerer Config in Datei schreiben
+
                 if not has_must_criteria and not has_qual_groups:
-                    f.write(f"# ⚠️ WARNUNG: Keine Qualifikationskriterien erkannt!\n")
+                    f.write(f"# WARNUNG: Keine Qualifikationskriterien erkannt!\n")
                     f.write(f"# Alle Kandidaten werden als qualifiziert eingestuft.\n")
-                
+
                 f.write("\n")
                 yaml.dump(config, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
-            
+
             print(f"[OK] Config geschrieben: {output_file}")
-        
+
         return config
     
+    def _extract_criteria(
+        self, protocol: Dict[str, Any], use_llm: bool = True
+    ):
+        """
+        Identifiziert Qualifikationskriterien aus dem Protokoll-Template.
+
+        Bevorzugt LLM-basierte Erkennung (QualificationVerifier.identify_criteria).
+        Fallback auf deterministische Methoden wenn LLM nicht verfuegbar oder
+        use_llm=False.
+
+        Returns:
+            Tuple (must_criteria: list, qualification_groups: list)
+        """
+        has_llm_keys = bool(
+            os.getenv("ANTHROPIC_API_KEY") or os.getenv("OPENAI_API_KEY")
+        )
+
+        if use_llm and has_llm_keys:
+            try:
+                from qualification_verifier import QualificationVerifier
+                verifier = QualificationVerifier()
+                result = verifier.identify_criteria(protocol)
+                qual_groups = result.get("qualification_groups", [])
+                must_criteria = result.get("must_criteria", [])
+                logger.info(
+                    f"LLM-basierte Kriterien-Erkennung: "
+                    f"{len(qual_groups)} Gruppen, {len(must_criteria)} must_criteria"
+                )
+                return must_criteria, qual_groups
+            except Exception as e:
+                logger.warning(
+                    f"LLM-Kriterien-Erkennung fehlgeschlagen, Fallback auf "
+                    f"deterministischen Modus: {e}"
+                )
+
+        # Fallback: deterministische Methoden
+        logger.info("Deterministischer Fallback fuer Kriterien-Erkennung")
+        return self._extract_must_criteria(protocol), self._extract_qualification_groups(protocol)
+
     def _generate_heuristic_rules(self, protocol: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Generate heuristic rules from prompt questions."""
         rules = []

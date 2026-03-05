@@ -96,6 +96,10 @@ class QualificationGroup(BaseModel):
     min_required: int = Field(default=1, description="Minimum number of fulfilled options (for OR logic)")
     is_mandatory: bool = Field(default=True, description="Whether this group must be fulfilled")
     error_msg: Optional[str] = None
+    criterion_type: Optional[str] = Field(
+        default=None,
+        description="Typ des Kriteriums: 'ausbildung'|'sprache'|'fuehrerschein'|'erfahrung'"
+    )
 
 
 class RoutingCondition(BaseModel):

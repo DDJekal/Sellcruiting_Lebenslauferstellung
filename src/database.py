@@ -173,7 +173,45 @@ class DatabaseClient:
                 CREATE INDEX IF NOT EXISTS idx_analyses_quality ON call_analyses(quality_score);
             """)
             
-            logger.info("[DATABASE] Tables initialized (calls + call_analyses)")
+            # ============================================================
+            # TABLE 3: whatsapp_sessions (WhatsApp Fallback Conversations)
+            # ============================================================
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS whatsapp_sessions (
+                    id                   SERIAL PRIMARY KEY,
+                    conversation_id      VARCHAR(255),
+                    applicant_id         VARCHAR(255) NOT NULL,
+                    campaign_id          VARCHAR(255) NOT NULL,
+                    to_number            VARCHAR(50) NOT NULL,
+                    
+                    -- Session State
+                    status               VARCHAR(20) DEFAULT 'pending',
+                    trigger_reason       VARCHAR(50),
+                    
+                    -- Conversation Tracking
+                    messages             JSONB DEFAULT '[]'::jsonb,
+                    current_step         INTEGER DEFAULT 0,
+                    
+                    -- Candidate / Campaign Info
+                    candidate_first_name VARCHAR(100),
+                    candidate_last_name  VARCHAR(100),
+                    company_name         VARCHAR(255),
+                    campaign_role_title  VARCHAR(255),
+                    
+                    -- Timestamps
+                    created_at           TIMESTAMP DEFAULT NOW(),
+                    last_message_at      TIMESTAMP,
+                    completed_at         TIMESTAMP
+                );
+                
+                CREATE INDEX IF NOT EXISTS idx_wa_sessions_campaign ON whatsapp_sessions(campaign_id);
+                CREATE INDEX IF NOT EXISTS idx_wa_sessions_status ON whatsapp_sessions(status);
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_wa_sessions_active
+                    ON whatsapp_sessions(to_number, campaign_id)
+                    WHERE status IN ('pending', 'active');
+            """)
+            
+            logger.info("[DATABASE] Tables initialized (calls + call_analyses + whatsapp_sessions)")
     
     # =========================================================================
     # CALL LOGGING
@@ -630,3 +668,160 @@ class DatabaseClient:
                     limit, offset
                 )
             return [dict(row) for row in rows]
+    
+    # =========================================================================
+    # WHATSAPP SESSION MANAGEMENT
+    # =========================================================================
+    
+    @classmethod
+    async def create_whatsapp_session(
+        cls,
+        applicant_id: str,
+        campaign_id: str,
+        to_number: str,
+        trigger_reason: str,
+        conversation_id: Optional[str] = None,
+        candidate_first_name: Optional[str] = None,
+        candidate_last_name: Optional[str] = None,
+        company_name: Optional[str] = None,
+        campaign_role_title: Optional[str] = None
+    ) -> int:
+        """
+        Create a new WhatsApp fallback session.
+        
+        Returns:
+            ID of the created session
+        """
+        pool = await cls.get_pool()
+        
+        async with pool.acquire() as conn:
+            session_id = await conn.fetchval("""
+                INSERT INTO whatsapp_sessions (
+                    conversation_id, applicant_id, campaign_id, to_number,
+                    trigger_reason,
+                    candidate_first_name, candidate_last_name,
+                    company_name, campaign_role_title
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                RETURNING id
+            """,
+                conversation_id,
+                applicant_id,
+                campaign_id,
+                to_number,
+                trigger_reason,
+                candidate_first_name,
+                candidate_last_name,
+                company_name,
+                campaign_role_title
+            )
+            
+            logger.info(
+                f"[DATABASE] WhatsApp session created: id={session_id}, "
+                f"applicant={applicant_id}, campaign={campaign_id}, reason={trigger_reason}"
+            )
+            return session_id
+    
+    @classmethod
+    async def get_active_whatsapp_session(
+        cls,
+        to_number: str,
+        campaign_id: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Find an active WhatsApp session for a phone number.
+        
+        Looks for sessions with status 'pending' or 'active'.
+        If campaign_id is provided, filters by it. Otherwise returns
+        the most recent active session for that number.
+        """
+        pool = await cls.get_pool()
+        
+        async with pool.acquire() as conn:
+            if campaign_id:
+                row = await conn.fetchrow("""
+                    SELECT * FROM whatsapp_sessions
+                    WHERE to_number = $1
+                      AND campaign_id = $2
+                      AND status IN ('pending', 'active')
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                """, to_number, campaign_id)
+            else:
+                row = await conn.fetchrow("""
+                    SELECT * FROM whatsapp_sessions
+                    WHERE to_number = $1
+                      AND status IN ('pending', 'active')
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                """, to_number)
+            
+            return dict(row) if row else None
+    
+    @classmethod
+    async def append_whatsapp_message(
+        cls,
+        session_id: int,
+        role: str,
+        content: str
+    ) -> None:
+        """
+        Append a message to the session's messages JSONB array.
+        
+        Args:
+            session_id: WhatsApp session ID
+            role: "agent" or "user"
+            content: Message text
+        """
+        pool = await cls.get_pool()
+        
+        message_obj = json.dumps({
+            "role": role,
+            "content": content,
+            "timestamp": datetime.utcnow().isoformat()
+        })
+        
+        async with pool.acquire() as conn:
+            await conn.execute("""
+                UPDATE whatsapp_sessions
+                SET messages = messages || $1::jsonb,
+                    last_message_at = NOW(),
+                    status = CASE WHEN status = 'pending' THEN 'active' ELSE status END
+                WHERE id = $2
+            """, message_obj, session_id)
+    
+    @classmethod
+    async def update_whatsapp_session_status(
+        cls,
+        session_id: int,
+        status: str
+    ) -> None:
+        """
+        Update session status.
+        
+        Valid statuses: pending, active, completed, timeout, cancelled
+        """
+        pool = await cls.get_pool()
+        
+        async with pool.acquire() as conn:
+            completed_at = datetime.utcnow() if status in ("completed", "timeout", "cancelled") else None
+            
+            await conn.execute("""
+                UPDATE whatsapp_sessions
+                SET status = $1,
+                    completed_at = COALESCE($2, completed_at)
+                WHERE id = $3
+            """, status, completed_at, session_id)
+            
+            logger.info(f"[DATABASE] WhatsApp session {session_id} -> status={status}")
+    
+    @classmethod
+    async def get_whatsapp_session(cls, session_id: int) -> Optional[Dict[str, Any]]:
+        """Get a single WhatsApp session by ID."""
+        pool = await cls.get_pool()
+        
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT * FROM whatsapp_sessions WHERE id = $1",
+                session_id
+            )
+            return dict(row) if row else None
