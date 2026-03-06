@@ -298,6 +298,8 @@ class HOCClient:
                 "phone": applicant_data.get("phone"),
             },
             "protocol_source": data.get("protocol_source", f"api_campaign_{campaign_id}"),
+            "call_status": "success",
+            "failure_reason": None,
             "elevenlabs": elevenlabs_enriched,
             "temporal_context": temporal_enriched,
             "processing": processing,
@@ -352,7 +354,6 @@ class HOCClient:
                 "pipeline_skipped": True,
                 "skip_reason": "failed_call",
                 "call_duration_secs": duration_secs,
-                "termination_reason": termination_reason,
             },
             "files": {},
         }
