@@ -25,6 +25,9 @@ ANALYTICS_API_KEY = os.getenv("ANALYTICS_API_KEY")
 WHATSAPP_ENABLED = os.getenv("WHATSAPP_ENABLED", "false").lower() == "true"
 MIN_CALL_DURATION_FOR_PIPELINE = 120  # Calls shorter than 2 min are candidates for WhatsApp fallback
 
+# Transkriptbasierter Voicemail-Override (default aktiv)
+VOICEMAIL_TRANSCRIPT_OVERRIDE = os.getenv("VOICEMAIL_TRANSCRIPT_OVERRIDE", "true").lower() != "false"
+
 # termination_reason values that indicate the candidate was not reached.
 # Extend this list as you discover new values from ElevenLabs.
 WHATSAPP_TRIGGER_REASONS = {
@@ -217,6 +220,17 @@ async def process_webhook(webhook_data: Dict[str, Any], conversation_id: str):
         
         # Extract transcript for potential analysis
         raw_transcript = transformer.transform(webhook_data)
+        
+        # =================================================================
+        # VOICEMAIL OVERRIDE (transkriptbasiert, nur bei high confidence)
+        # Korrigiert unzuverlässige ElevenLabs-Kategorisierung, bevor
+        # Failed-Call-Erkennung und HOC-Metadaten-Versand laufen.
+        # =================================================================
+        if VOICEMAIL_TRANSCRIPT_OVERRIDE:
+            from voicemail_detector import apply_override
+            elevenlabs_metadata = apply_override(
+                elevenlabs_metadata, raw_transcript, only_high_confidence=True
+            )
         
         # =================================================================
         # FAILED-CALL DETECTION (always active, independent of WhatsApp)
