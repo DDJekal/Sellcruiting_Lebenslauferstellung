@@ -3,6 +3,12 @@ Transkriptbasierte Erkennung von Anrufbeantworter/Mailbox.
 
 Wird genutzt, um den von ElevenLabs gelieferten termination_reason
 bei hoher Konfidenz zu überschreiben (ElevenLabs ist oft ungenau).
+
+Liefert außerdem immer ein call_category-Feld:
+  "voicemail"     – Anrufbeantworter/Mailbox erkannt
+  "agent_ended"   – KI hat regulär aufgelegt (alle Phasen oder bewusster Abbruch)
+  "callee_ended"  – Gegenstelle hat aufgelegt (Gespräch nicht erfolgreich abgeschlossen)
+  "unknown"       – Nicht erreicht (no-answer, busy, failed) oder unklar
 """
 import re
 import logging
@@ -59,6 +65,36 @@ VOICEMAIL_PATTERNS = [
     re.compile(r"\bnicht\s+erreichbar\b", re.I),
     re.compile(r"\bsie\s+haben\s+.+\s+erreicht\b", re.I),
 ]
+
+
+def _call_category_from_termination_reason(termination_reason: str | None) -> str:
+    """
+    Leitet call_category aus dem termination_reason ab (ohne Transkript-Override).
+
+    Returns:
+        "voicemail"    – Mailbox/Anrufbeantworter
+        "agent_ended"  – KI hat aufgelegt (regulär oder DSGVO/Standort-Abbruch)
+        "callee_ended" – Gegenstelle hat aufgelegt
+        "unknown"      – Nicht erreicht (no-answer, busy, failed) oder unklar
+    """
+    reason = (termination_reason or "").lower().strip()
+
+    if not reason:
+        return "unknown"
+
+    if "voicemail" in reason:
+        return "voicemail"
+
+    if reason in ("no-answer", "busy", "failed"):
+        return "unknown"
+
+    if "call ended by remote party" in reason:
+        return "callee_ended"
+
+    if "end_call" in reason or "natural end" in reason:
+        return "agent_ended"
+
+    return "unknown"
 
 
 def _text_from_speaker(transcript: List[Dict[str, str]], speaker: str) -> str:
@@ -199,45 +235,57 @@ def apply_override(
     only_high_confidence: bool = True,
 ) -> Dict[str, Any]:
     """
-    Überschreibt termination_reason (und ggf. call_successful) in den Metadaten,
-    wenn die transkriptbasierte Erkennung mit ausreichender Konfidenz
-    Anrufbeantworter oder echtes Gespräch erkennt.
+    Überschreibt termination_reason in den Metadaten, wenn die transkriptbasierte
+    Erkennung mit ausreichender Konfidenz Anrufbeantworter oder echtes Gespräch erkennt.
+
+    Setzt immer call_category, call_category_source und original_termination_reason
+    (letzteres nur bei tatsächlichem Override), damit jeder Call einheitlich
+    kategorisiert ist.
 
     Args:
         metadata: Bestehende Metadaten (z.B. von ElevenLabsTransformer.extract_metadata).
         transcript: Transkript [{"speaker":"A"|"B","text":"..."}].
-        only_high_confidence: Wenn True, nur bei confidence "high" überschreiben.
+        only_high_confidence: Wenn True, termination_reason nur bei confidence "high" überschreiben.
 
     Returns:
-        Neue Metadaten (Kopie). Bei Überschreibung werden nur die bestehenden
-        Felder termination_reason und call_successful angepasst; keine neuen
-        Felder werden hinzugefügt (Output-Struktur bleibt unverändert).
+        Neue Metadaten-Kopie mit call_category, call_category_source (und bei Override
+        auch original_termination_reason) immer gesetzt.
     """
     duration = metadata.get("call_duration_secs") or 0
-    result = from_transcript(transcript, call_duration_secs=duration)
-    confidence = result["confidence"]
-    if only_high_confidence and confidence != "high":
-        return metadata
+    detector_result = from_transcript(transcript, call_duration_secs=duration)
+    confidence = detector_result["confidence"]
 
     out = dict(metadata)
     original = metadata.get("termination_reason")
 
-    if result["is_voicemail"] and confidence == "high":
+    # Voicemail mit ausreichender Konfidenz → termination_reason überschreiben
+    if detector_result["is_voicemail"] and (not only_high_confidence or confidence == "high"):
         out["termination_reason"] = "voicemail"
+        out["call_category"] = "voicemail"
+        out["original_termination_reason"] = original
+        out["call_category_source"] = "transcript_override"
         logger.info(
-            "[VOICEMAIL-DETECTOR] Status auf voicemail gesetzt (Transkript); "
-            "original_termination_reason=%s", original
+            "[VOICEMAIL-DETECTOR] termination_reason auf voicemail gesetzt (Transkript); "
+            "original=%s, confidence=%s", original, confidence
         )
         return out
 
     # Echtes Gespräch mit hoher Konfidenz, ElevenLabs hatte aber voicemail?
     el_reason = (original or "").lower()
-    if not result["is_voicemail"] and "voicemail" in el_reason:
+    if not detector_result["is_voicemail"] and confidence == "high" and "voicemail" in el_reason:
         out["termination_reason"] = "end_call tool was called."
+        out["call_category"] = "agent_ended"
+        out["original_termination_reason"] = original
+        out["call_category_source"] = "transcript_override"
         logger.info(
             "[VOICEMAIL-DETECTOR] Voicemail-Status überschrieben → echtes Gespräch; "
-            "original_termination_reason=%s", original
+            "original=%s", original
         )
         return out
 
-    return metadata
+    # Kein Transkript-Override – call_category aus ElevenLabs-Wert ableiten
+    out["call_category"] = _call_category_from_termination_reason(original)
+    out["call_category_source"] = "elevenlabs"
+    # original_termination_reason nur bei Override setzen; hier kein Override
+    out.setdefault("original_termination_reason", None)
+    return out

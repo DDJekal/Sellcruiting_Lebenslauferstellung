@@ -348,6 +348,31 @@ async def process_webhook(webhook_data: Dict[str, Any], conversation_id: str):
         if failed_criteria:
             logger.info(f"  - Failed criteria: {failed_criteria}")
         
+        # =================================================================
+        # CALLEE ENDED + LEBENSLAUFDATEN → als erfolgreich werten
+        # Wenn der Bewerber selbst aufgelegt hat, aber das Gespräch gut lief
+        # (Pipeline hat Lebenslaufdaten geliefert), wird der Status korrigiert.
+        # =================================================================
+        callee_ended = (elevenlabs_metadata.get("termination_reason") or "").strip().lower() == \
+            "call ended by remote party"
+        has_resume_data = bool(result.get("applicant_id") and result.get("resume"))
+        if callee_ended and has_resume_data:
+            elevenlabs_metadata["termination_reason"] = "end_call tool was called."
+            elevenlabs_metadata["call_category"] = "agent_ended"
+            elevenlabs_metadata["call_category_source"] = "callee_ended_good_conversation"
+            logger.info(
+                "[ROUTER] Bewerber hat aufgelegt, aber Lebenslaufdaten vorhanden → "
+                "termination_reason auf 'end_call tool was called.' gesetzt"
+            )
+
+        # =================================================================
+        # ANGEREICHERTE METADATEN IN RESULT ÜBERNEHMEN
+        # Damit HOC bei Success-Calls dieselben Felder erhält wie bei
+        # Failed-Calls (inkl. call_category, original_termination_reason, …).
+        # =================================================================
+        if "metadata" in result and isinstance(result["metadata"], dict):
+            result["metadata"]["elevenlabs"] = dict(elevenlabs_metadata)
+
         # Send to HOC (if configured)
         if os.getenv("HIRINGS_API_URL") and os.getenv("HIRING_API_TOKEN"):
             try:
