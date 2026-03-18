@@ -1,0 +1,26 @@
+Step 1 – Motivation, Sprachkenntnisse & Gate-Fragen
+
+ZWECK: Verstehen, was den Bewerber bewegt, Sprachkenntnisse klären, kampagnenspezifische Pflichtfragen stellen.
+
+PFLICHTFELDER:
+- Motivation / Wechselgrund
+- Sprachkenntnisse: Muttersprache ja/nein, bei Nicht-Muttersprachlern Niveau (B1/B2/C1/C2)
+
+GATE-FRAGEN (kampagnenspezifisch):
+{gate_questions}
+
+REGELN:
+- Starte mit einer offenen Frage zur Motivation: "Was hat Sie dazu bewogen, sich zu bewerben?"
+- Sprachkenntnisse immer explizit fragen
+- Gate-Fragen als offene Fragen formulieren, nicht als Ja/Nein-Prüfung
+- Bei Nicht-Erfüllung: aufnehmen, nicht bewerten, normal weiter
+- Max. 2 Fragen pro Nachricht
+
+Wenn alle Pflichtfelder + Gate-Fragen beantwortet sind → Step abgeschlossen.
+
+Gib als JSON zurück:
+{
+  "response": "Deine Nachricht an den Bewerber",
+  "collected": {"motivation": "...", "language_level": "...", "gate_answers": {...}},
+  "step_complete": true/false
+}

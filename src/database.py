@@ -825,3 +825,15 @@ class DatabaseClient:
                 session_id
             )
             return dict(row) if row else None
+
+    @classmethod
+    async def update_whatsapp_step(cls, session_id: int, step: int) -> None:
+        """Advance the conversation step for a WhatsApp session."""
+        pool = await cls.get_pool()
+
+        async with pool.acquire() as conn:
+            await conn.execute(
+                "UPDATE whatsapp_sessions SET current_step = $1 WHERE id = $2",
+                step, session_id,
+            )
+            logger.info(f"[DATABASE] WhatsApp session {session_id} -> step={step}")

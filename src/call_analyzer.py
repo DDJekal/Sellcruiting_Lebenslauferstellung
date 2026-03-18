@@ -83,6 +83,20 @@ ENGAGEMENT-BEWERTUNG:
 - "Hallo?" / "Wie bitte?" = Verständnisprobleme
 - Einsilbige Antworten nach langer Frage = Desinteresse oder Überforderung
 
+NATÜRLICHKEIT-BEWERTUNG (naturalness_score 1-10):
+Beurteile, wie natürlich und menschlich das Gespräch wirkt. Kriterien:
+- 9-10: Fließend, empathisch, reagiert situativ auf den Bewerber, klingt wie ein echter Mensch
+- 7-8: Weitgehend natürlich, gelegentlich etwas steif oder formelhaft
+- 5-6: Erkennbar automatisiert, wiederholt Formulierungen, starre Übergänge zwischen Phasen
+- 3-4: Roboterhaft, ignoriert Gesprächskontext, Phrasen wirken auswendig gelernt
+- 1-2: Völlig unnatürlich, keine situative Anpassung, Bewerber reagiert verwirrt
+Typische Probleme (in naturalness_issues dokumentieren):
+- Formelhafte Übergänge ("Gut, danke. Dann würden wir nun zu...")
+- Wiederholung identischer Einleitungsphrasen ("Verstanden", "Gut, danke")
+- Kein Bezug auf vorherige Antworten des Bewerbers
+- Unnatürliche Pausen oder abrupte Themenwechsel
+- Übermäßig formelle Sprache bei einfachen Themen
+
 Analysiere das Transkript und gib AUSSCHLIESSLICH folgendes JSON zurück (keine Erklärung davor oder danach):
 
 {
@@ -131,6 +145,8 @@ Analysiere das Transkript und gib AUSSCHLIESSLICH folgendes JSON zurück (keine 
   "vague_answers": [
     {"topic": "<Thema>", "answer_given": "<Was gesagt wurde>", "precision": "<vague|unclear|partial>"}
   ],
+  "naturalness_score": <1-10>,
+  "naturalness_issues": ["Beschreibung 1", ...],
   "analysis_summary": "<2-3 Sätze Zusammenfassung>",
   "improvement_suggestions": ["Vorschlag 1", "Vorschlag 2", ...]
 }"""
@@ -248,7 +264,8 @@ Analysiere dieses Gespräch und gib das JSON-Ergebnis zurück."""
             "sentiment_flow", "signs_of_disinterest", "signs_of_confusion",
             "agent_errors", "rule_violations", "missing_topics",
             "vague_answers", "improvement_suggestions",
-            "phases_completed", "phases_missing"
+            "phases_completed", "phases_missing",
+            "naturalness_issues",
         ]
         
         serialized = {}

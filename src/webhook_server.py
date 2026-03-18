@@ -504,12 +504,13 @@ def _is_failed_call(
 ) -> bool:
     """
     Detect if a call failed (candidate was not reached).
-    
+
     This check runs ALWAYS, independent of WHATSAPP_ENABLED.
     Failed calls skip the pipeline (no resume/protocol) but still send
     call metadata to HOC via /applicants/ai/call/meta for KPI tracking.
-    
-    Detection criteria (any one is sufficient):
+
+    Detection logic:
+    0. Duration guarantee: >= 2 min → always reached (success)
     1. call_successful is explicitly not "success"
     2. termination_reason matches known failure reasons
     3. Completely empty transcript (0 turns)
@@ -518,36 +519,41 @@ def _is_failed_call(
     call_successful = metadata.get("call_successful")
     call_duration_secs = metadata.get("call_duration_secs") or 0
     termination_reason = (metadata.get("termination_reason") or "").lower().strip()
-    
+
+    if call_duration_secs >= MIN_CALL_DURATION_FOR_PIPELINE:
+        logger.info(
+            f"[FAILED-CALL] Call >= {MIN_CALL_DURATION_FOR_PIPELINE}s "
+            f"({call_duration_secs}s) → definitiv erreicht"
+        )
+        return False
+
     if call_successful and call_successful != "success":
         logger.info(f"[FAILED-CALL] call_successful={call_successful}")
         return True
-    
-    # Exakter Match
+
     if termination_reason in WHATSAPP_TRIGGER_REASONS:
         logger.info(f"[FAILED-CALL] termination_reason={termination_reason}")
         return True
-    
-    # Substring-Match für Varianten wie "voicemail_detection tool was called."
+
     if any(reason in termination_reason for reason in WHATSAPP_TRIGGER_REASONS):
         logger.info(f"[FAILED-CALL] termination_reason contains: {termination_reason}")
         return True
-    
+
     if len(transcript) == 0:
         logger.info("[FAILED-CALL] Transkript komplett leer (0 Turns)")
         return True
-    
+
     meaningful_turns = [
         t for t in transcript
         if t.get("speaker") == "A" and len(t.get("text", "")) > 5
     ]
-    if call_duration_secs < MIN_CALL_DURATION_FOR_PIPELINE and len(meaningful_turns) == 0:
+    if len(meaningful_turns) == 0:
         logger.info(
             f"[FAILED-CALL] Kurzer Call ({call_duration_secs}s) ohne "
             f"aussagekräftige Bewerber-Antworten"
         )
         return True
-    
+
     return False
 
 
@@ -566,48 +572,34 @@ async def _maybe_trigger_whatsapp_fallback(
     Returns True if WhatsApp was triggered (caller should skip pipeline).
     Returns False if the call should proceed through the normal pipeline.
     
-    Detection logic:
-    1. call_successful is not "success"
-    2. Call duration very short (< MIN_CALL_DURATION_FOR_PIPELINE) with empty/minimal transcript
-    3. termination_reason matches known failure reasons
+    Triggers ONLY for:
+    - Voicemail (answering machine detected)
+    - Not reached (no-answer, busy, failed)
+    Does NOT trigger for call aborts or short conversations.
     """
-    call_successful = metadata.get("call_successful")
-    call_duration_secs = metadata.get("call_duration_secs") or 0
     termination_reason = (metadata.get("termination_reason") or "").lower().strip()
     to_number = metadata.get("to_number")
     applicant_id = metadata.get("applicant_id")
     
-    # Need minimum data to trigger WhatsApp
     if not to_number or not applicant_id:
         logger.info(f"[ROUTER] No to_number or applicant_id, cannot trigger WhatsApp")
         return False
     
     trigger_reason = None
     
-    # Check 1: Explicit failure status from ElevenLabs
-    if call_successful and call_successful != "success":
-        trigger_reason = "call_not_successful"
-    
-    # Check 2: Known termination reasons indicating unreachable
-    if not trigger_reason and termination_reason in WHATSAPP_TRIGGER_REASONS:
+    # Only trigger for voicemail or not-reached scenarios
+    if termination_reason in WHATSAPP_TRIGGER_REASONS:
         trigger_reason = termination_reason
-    
-    # Check 3: Very short call with no meaningful transcript
-    # (short_call_override already catches this for qualification,
-    #  but for WhatsApp we also want to check transcript emptiness)
-    if not trigger_reason:
-        meaningful_turns = [t for t in transcript if t.get("speaker") == "A" and len(t.get("text", "")) > 5]
-        if call_duration_secs < MIN_CALL_DURATION_FOR_PIPELINE and len(meaningful_turns) == 0:
-            if call_duration_secs > 0:
-                trigger_reason = "short_call_no_response"
+    elif any(reason in termination_reason for reason in WHATSAPP_TRIGGER_REASONS):
+        trigger_reason = termination_reason
     
     if not trigger_reason:
         return False
     
     logger.info(
         f"[ROUTER] Call {conversation_id} detected as failed: "
-        f"reason={trigger_reason}, duration={call_duration_secs}s, "
-        f"termination={termination_reason}, successful={call_successful}"
+        f"reason={trigger_reason}, "
+        f"termination={termination_reason}"
     )
     
     # Log the failed call to DB before triggering WhatsApp
@@ -648,85 +640,82 @@ async def _maybe_trigger_whatsapp_fallback(
 # WHATSAPP WEBHOOK ENDPOINT
 # =============================================================================
 
+@app.get("/whatsapp/webhook")
+async def whatsapp_verify_webhook(request: Request):
+    """Meta webhook verification (called once during setup)."""
+    params = dict(request.query_params)
+    from whatsapp_cloud_client import WhatsAppCloudClient
+    client = WhatsAppCloudClient()
+    challenge = client.verify_webhook(params)
+    if challenge:
+        from fastapi.responses import PlainTextResponse
+        return PlainTextResponse(challenge)
+    raise HTTPException(status_code=403, detail="Verification failed")
+
+
 @app.post("/whatsapp/webhook")
 async def whatsapp_incoming_webhook(request: Request):
     """
-    Receive incoming WhatsApp messages from Twilio.
-    
-    Twilio sends POST with application/x-www-form-urlencoded, not JSON.
-    Key fields: From, Body, MessageSid, To, NumMedia
-    
-    Returns empty TwiML response (Twilio expects this).
+    Receive incoming WhatsApp messages from Meta Cloud API.
+
+    Meta sends JSON with entry[].changes[].value.messages[].
+    Returns 200 OK (Meta expects this).
     """
     try:
-        # Parse form data (Twilio sends URL-encoded, not JSON)
-        form_data = await request.form()
-        params = dict(form_data)
-        
-        from_number = params.get("From", "")
-        message_body = params.get("Body", "").strip()
-        message_sid = params.get("MessageSid", "")
-        
-        if not from_number or not message_body:
-            logger.warning(f"[WHATSAPP-WH] Empty message or missing From: {params}")
-            return _twiml_empty_response()
-        
-        logger.info(f"[WHATSAPP-WH] Incoming: from={from_number}, sid={message_sid}, body={message_body[:80]}...")
-        
-        # Validate Twilio signature (security)
-        twilio_signature = request.headers.get("X-Twilio-Signature", "")
-        if twilio_signature:
-            from twilio_client import TwilioWhatsAppClient
-            twilio = TwilioWhatsAppClient()
-            webhook_url = str(request.url)
-            if not twilio.validate_webhook_signature(webhook_url, params, twilio_signature):
-                logger.warning(f"[WHATSAPP-WH] Invalid Twilio signature from {from_number}")
-                raise HTTPException(status_code=403, detail="Invalid signature")
-        
-        # Strip "whatsapp:" prefix for DB lookup
-        clean_number = from_number.replace("whatsapp:", "")
-        
+        body_bytes = await request.body()
+        payload = await request.json()
+
+        # Validate Meta signature
+        from whatsapp_cloud_client import WhatsAppCloudClient
+        wa_client = WhatsAppCloudClient()
+        signature = request.headers.get("X-Hub-Signature-256", "")
+        if signature and not wa_client.validate_signature(body_bytes, signature):
+            logger.warning("[WHATSAPP-WH] Invalid Meta signature")
+            raise HTTPException(status_code=403, detail="Invalid signature")
+
+        incoming = wa_client.parse_incoming_messages(payload)
+        if not incoming:
+            return {"status": "ok"}
+
         if not DATABASE_ENABLED:
             logger.warning("[WHATSAPP-WH] Database not enabled, cannot process WhatsApp messages")
-            return _twiml_empty_response()
-        
-        # Find active session for this number
+            return {"status": "ok"}
+
         from database import DatabaseClient
-        session = await DatabaseClient.get_active_whatsapp_session(clean_number)
-        
-        if not session:
-            # Also try with whatsapp: prefix
-            session = await DatabaseClient.get_active_whatsapp_session(from_number)
-        
-        if not session:
-            logger.info(f"[WHATSAPP-WH] No active session for {from_number}, ignoring message")
-            return _twiml_empty_response()
-        
-        # Handle the incoming message
         from whatsapp_handler import WhatsAppHandler
         handler = WhatsAppHandler()
-        await handler.handle_incoming_message(
-            session=session,
-            message_body=message_body,
-            from_number=from_number
-        )
-        
-        return _twiml_empty_response()
-        
+
+        for msg in incoming:
+            from_number = msg["from_number"]
+            message_body = msg["message_body"].strip()
+            message_id = msg["message_id"]
+
+            if not from_number or not message_body:
+                continue
+
+            logger.info(
+                f"[WHATSAPP-WH] Incoming: from={from_number}, "
+                f"wamid={message_id}, body={message_body[:80]}..."
+            )
+
+            session = await DatabaseClient.get_active_whatsapp_session(from_number)
+            if not session:
+                logger.info(f"[WHATSAPP-WH] No active session for {from_number}, ignoring")
+                continue
+
+            await handler.handle_incoming_message(
+                session=session,
+                message_body=message_body,
+                from_number=from_number,
+            )
+
+        return {"status": "ok"}
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"[WHATSAPP-WH] Error processing incoming message: {e}", exc_info=True)
-        return _twiml_empty_response()
-
-
-def _twiml_empty_response():
-    """Return an empty TwiML response (Twilio expects XML)."""
-    from fastapi.responses import Response
-    return Response(
-        content="<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response></Response>",
-        media_type="application/xml"
-    )
+        return {"status": "ok"}
 
 
 # =============================================================================

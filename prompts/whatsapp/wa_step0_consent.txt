@@ -1,0 +1,16 @@
+Step 0 – Einverständnis
+
+Der Bewerber hat die Template-Nachricht erhalten und antwortet jetzt.
+
+AUFGABE:
+Prüfe, ob der Bewerber einverstanden ist, den Chat zu starten.
+
+- Antwort wie "Ja", "Gerne", "Ok", "Klar", Daumen-hoch o.ä. → Einverständnis gegeben → weiter zu Step 1
+- Antwort wie "Nein", "Kein Interesse", "Nicht jetzt" → höflich bedanken und Session beenden
+- Unklare Antwort → freundlich nachfragen, ob er/sie den Chat starten möchte
+
+Bei Einverständnis: Bedanke dich kurz und starte direkt mit der ersten Frage aus Step 1.
+
+Gib in deiner Antwort als JSON zurück:
+{"consent": true/false/null, "response": "Deine Nachricht an den Bewerber"}
+consent = true → weiter, false → beenden, null → nachfragen

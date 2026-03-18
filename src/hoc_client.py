@@ -299,7 +299,6 @@ class HOCClient:
             },
             "protocol_source": data.get("protocol_source", f"api_campaign_{campaign_id}"),
             "call_status": "success",
-            "failure_reason": None,
             "elevenlabs": elevenlabs_enriched,
             "temporal_context": temporal_enriched,
             "processing": processing,
@@ -347,7 +346,6 @@ class HOCClient:
             "applicant": applicant_info,
             "protocol_source": f"api_campaign_{campaign_id}",
             "call_status": "failed",
-            "failure_reason": termination_reason,
             "elevenlabs": elevenlabs_enriched,
             "temporal_context": {},
             "processing": {

@@ -5,38 +5,61 @@ services:
     region: frankfurt
     plan: starter
     buildCommand: pip install --upgrade pip && pip install -r requirements.txt
-    startCommand: python webhook_server.py
+    startCommand: uvicorn src.webhook_server:app --host 0.0.0.0 --port $PORT
     envVars:
-      # OpenAI API (required)
+      # ── LLM APIs ──────────────────────────────────────────────────
       - key: OPENAI_API_KEY
-        sync: false  # Set manually in Render Dashboard
-      
-      # OpenAI Model (optional, defaults to gpt-4o-2024-08-06)
+        sync: false
       - key: OPENAI_MODEL
         value: gpt-4o-2024-08-06
-      
-      # Anthropic API (optional, for MCP temporal validation)
       - key: ANTHROPIC_API_KEY
         sync: false
-      
-      # MCP Configuration (optional)
+
+      # ── HOC API ───────────────────────────────────────────────────
+      - key: HIRINGS_API_URL
+        sync: false
+      - key: HIRING_API_TOKEN
+        sync: false
+
+      # ── Datenbank ─────────────────────────────────────────────────
+      - key: DATABASE_URL
+        sync: false
+
+      # ── ElevenLabs ────────────────────────────────────────────────
+      - key: ELEVENLABS_API_KEY
+        sync: false
+
+      # ── Analytics ─────────────────────────────────────────────────
+      - key: ANALYTICS_API_KEY
+        sync: false
+
+      # ── WhatsApp Bot (Meta Cloud API) ─────────────────────────────
+      - key: WHATSAPP_ENABLED
+        value: "false"           # auf "true" setzen wenn Testphase abgeschlossen
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: WHATSAPP_WABA_ID
+        sync: false
+      - key: WHATSAPP_API_TOKEN
+        sync: false
+      - key: WHATSAPP_VERIFY_TOKEN
+        sync: false
+      - key: WHATSAPP_API_VERSION
+        value: v22.0
+      - key: WHATSAPP_TEMPLATE_NAME
+        sync: false              # Name des genehmigten Meta-Templates eintragen
+      - key: WHATSAPP_APP_SECRET
+        sync: false
+      - key: WHATSAPP_SESSION_TIMEOUT_HOURS
+        value: "24"
+
+      # ── Pipeline-Optionen ─────────────────────────────────────────
       - key: USE_MCP_TEMPORAL_VALIDATION
-        value: false
-      - key: MCP_CONFIDENCE_THRESHOLD
-        value: "0.8"
-      
-      # Protocol Template (optional, defaults to 63)
+        value: "false"
       - key: DEFAULT_PROTOCOL_TEMPLATE_ID
         value: "63"
-      
-      # HOC API Configuration (set these after HOC details are available)
-      - key: HOC_API_URL
-        sync: false  # e.g., https://hoc-api.example.com
-      - key: HOC_API_KEY
-        sync: false
-    
-    # Health check
+      - key: VOICEMAIL_TRANSCRIPT_OVERRIDE
+        value: "true"
+
     healthCheckPath: /health
-    
-    # Auto-deploy on push
     autoDeploy: true

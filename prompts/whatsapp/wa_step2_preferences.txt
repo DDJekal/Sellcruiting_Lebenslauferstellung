@@ -1,0 +1,26 @@
+Step 2 – Präferenzen, Fragebogen-Fragen & Wunschstarttermin
+
+ZWECK: Wünsche des Bewerbers zum Arbeitsalltag erfassen, kampagnenspezifische Fragen stellen, Starttermin klären.
+
+PFLICHTFELDER:
+- Wunschstarttermin (ab wann könnte der Bewerber anfangen)
+- Antworten auf alle Präferenzfragen
+
+PRÄFERENZFRAGEN (kampagnenspezifisch):
+{preference_questions}
+
+REGELN:
+- Bei Auswahl-Fragen: 2-3 Optionen nennen, dann offen lassen
+- Bei Ja/Nein-Fragen: kurz und eingebettet fragen
+- Starttermin: "Ab wann könnten Sie denn starten?"
+- Max. 2 Fragen pro Nachricht
+- Wenn der Bewerber etwas schon beantwortet hat: nicht nochmal fragen
+
+Wenn alle Pflichtfelder beantwortet → Step abgeschlossen.
+
+Gib als JSON zurück:
+{
+  "response": "Deine Nachricht an den Bewerber",
+  "collected": {"start_date": "...", "preference_answers": {...}},
+  "step_complete": true/false
+}

@@ -7,6 +7,7 @@ from typing import Dict, Any
 from datetime import datetime
 
 from elevenlabs_transformer import ElevenLabsTransformer
+from whatsapp_transformer import WhatsAppTransformer
 from temporal_enricher import TemporalEnricher
 from type_enricher import TypeEnricher
 from config_parser import ConfigParser
@@ -311,3 +312,233 @@ def process_elevenlabs_call(webhook_data: Dict[str, Any]) -> Dict[str, Any]:
         }
     }
 
+
+class PipelineProcessor:
+    """Wrapper for processing WhatsApp sessions through the same pipeline."""
+
+    async def process_whatsapp_session(self, session_id: int) -> Dict[str, Any]:
+        """
+        Process a completed WhatsApp session through the standard pipeline.
+
+        Loads session from DB, transforms messages to internal transcript,
+        then runs the same pipeline as phone calls (Resume, Protocol, HOC).
+        """
+        from database import DatabaseClient
+
+        session = await DatabaseClient.get_whatsapp_session(session_id)
+        if not session:
+            raise ValueError(f"WhatsApp session {session_id} not found")
+
+        messages = session.get("messages") or []
+        if isinstance(messages, str):
+            messages = json.loads(messages)
+
+        wa_transformer = WhatsAppTransformer()
+        transcript = wa_transformer.transform(messages)
+        metadata = wa_transformer.extract_metadata(session)
+
+        if not transcript:
+            logger.warning(f"[WA-PIPELINE] Empty transcript for session {session_id}")
+            return {"error": "empty_transcript", "session_id": session_id}
+
+        conversation_id = metadata.get("conversation_id") or f"wa_session_{session_id}"
+        campaign_id = metadata.get("campaign_id")
+        call_timestamp = metadata.get("start_time_unix_secs")
+
+        logger.info(
+            f"[WA-PIPELINE] Processing session {session_id}: "
+            f"campaign={campaign_id}, turns={len(transcript)}"
+        )
+
+        use_mcp = os.getenv("USE_MCP_TEMPORAL_VALIDATION", "false").lower() == "true"
+        temporal_enricher = TemporalEnricher(reference_timestamp=call_timestamp)
+        transcript = temporal_enricher.enrich_transcript(transcript, use_mcp=use_mcp)
+        temporal_context = temporal_enricher.extract_temporal_context(transcript)
+
+        protocol = None
+        protocol_source = "unknown"
+        original_protocol_metadata = {}
+
+        if campaign_id:
+            try:
+                qc = QuestionnaireClient()
+                api_transcript = qc.get_questionnaire_sync(campaign_id)
+
+                original_protocol_metadata = {
+                    "id": api_transcript.get("id"),
+                    "name": api_transcript.get("name"),
+                    "created_on": api_transcript.get("created_on"),
+                    "updated_on": api_transcript.get("updated_on"),
+                }
+                for page in api_transcript.get("pages", []):
+                    original_protocol_metadata[f"page_{page['id']}"] = {
+                        "created_on": page.get("created_on"),
+                        "updated_on": page.get("updated_on"),
+                    }
+                    for prompt in page.get("prompts", []):
+                        original_protocol_metadata[f"prompt_{prompt['id']}"] = {
+                            "information": prompt.get("information"),
+                            "is_template": prompt.get("is_template"),
+                            "created_on": prompt.get("created_on"),
+                            "updated_on": prompt.get("updated_on"),
+                            "type": prompt.get("type"),
+                        }
+
+                qt = QuestionnaireTransformer()
+                protocol = qt.transform(api_transcript, campaign_id=campaign_id)
+                protocol_source = f"api_campaign_{campaign_id}"
+            except Exception as e:
+                logger.warning(f"[WA-PIPELINE] Failed to fetch protocol for campaign {campaign_id}: {e}")
+
+        if not protocol:
+            protocol_template_id = int(os.getenv("DEFAULT_PROTOCOL_TEMPLATE_ID", "63"))
+            protocol_path = Path("Input2/Gesprächsprotokollbeispiel_2.json")
+            if not protocol_path.exists():
+                raise FileNotFoundError(f"Protocol template not found: {protocol_path}")
+            with open(protocol_path, "r", encoding="utf-8") as f:
+                protocol = json.load(f)
+            protocol_source = f"local_template_{protocol_template_id}"
+
+        protocol_id = protocol.get("id", 63)
+        config_path = Path(f"config/mandanten/template_{protocol_id}.yaml")
+        if not config_path.exists():
+            config_generator = ConfigGenerator()
+            config_data = config_generator.generate_config(protocol, output_path=config_path)
+            mandanten_config = MandantenConfig(**config_data)
+        else:
+            import yaml
+            with open(config_path, "r", encoding="utf-8") as f:
+                config_data = yaml.safe_load(f)
+            mandanten_config = MandantenConfig(**config_data)
+
+        type_enricher = TypeEnricher()
+        config_parser = ConfigParser()
+        extractor = Extractor()
+        mapper = Mapper()
+        validator = Validator()
+        resume_builder = ResumeBuilder()
+        qualification_matcher = QualificationMatcher()
+
+        shadow_types = type_enricher.infer_types(protocol, mandanten_config)
+
+        weitere_info_page = next(
+            (p for p in protocol["pages"] if p["name"] == "Weitere Informationen"), None
+        )
+        extracted_grounding = {}
+        if weitere_info_page:
+            extracted_grounding = config_parser.extract_grounding(weitere_info_page["prompts"])
+
+        grounding = {
+            **mandanten_config.grounding,
+            **extracted_grounding,
+            "temporal_context": temporal_context,
+            "elevenlabs_metadata": metadata,
+        }
+
+        all_prompts = []
+        for page in protocol["pages"]:
+            all_prompts.extend(page["prompts"])
+
+        extracted_answers = extractor.extract(transcript, shadow_types, grounding, all_prompts)
+        filled_protocol = mapper.map_answers(protocol, shadow_types, extracted_answers)
+
+        applicant_resume = resume_builder.build_resume(
+            transcript=transcript,
+            elevenlabs_metadata=metadata,
+            temporal_context=temporal_context,
+        )
+
+        filled_protocol = qualification_matcher.enrich_protocol_with_resume(
+            filled_protocol=filled_protocol,
+            resume=applicant_resume.resume,
+            confidence_threshold=0.90,
+        )
+        filled_protocol = validator.apply_routing_rules(filled_protocol, mandanten_config)
+
+        if mandanten_config.qualification_groups:
+            qualification_verifier = QualificationVerifier()
+            verified_answers = qualification_verifier.verify_criteria(
+                mandanten_config.qualification_groups, transcript
+            )
+            if verified_answers:
+                for page in filled_protocol.pages:
+                    for prompt in page.prompts:
+                        if prompt.id in verified_answers:
+                            prompt.answer = verified_answers[prompt.id]
+
+        qualification_evaluation = validator.evaluate_qualification(
+            filled_protocol,
+            mandanten_config,
+            anerkennung_status=applicant_resume.resume.anerkennung_status,
+        )
+
+        applicant_resume.resume.summary = qualification_evaluation["summary"]
+        applicant_resume.resume.qualified = qualification_evaluation["is_qualified"]
+
+        # Build protocol_minimal (same structure as ElevenLabs pipeline)
+        protocol_minimal = {
+            "id": filled_protocol.protocol_id,
+            "name": filled_protocol.protocol_name,
+            "created_on": original_protocol_metadata.get("created_on"),
+            "updated_on": original_protocol_metadata.get("updated_on"),
+            "campaign_id": campaign_id,
+            "conversation_id": conversation_id,
+            "pages": [],
+        }
+        for page in filled_protocol.pages:
+            page_meta = original_protocol_metadata.get(f"page_{page.id}", {})
+            minimal_prompts = []
+            for prompt in page.prompts:
+                prompt_meta = original_protocol_metadata.get(f"prompt_{prompt.id}", {})
+                minimal_prompts.append({
+                    "id": prompt.id,
+                    "question": prompt.question,
+                    "information": prompt_meta.get("information"),
+                    "position": len(minimal_prompts) + 1,
+                    "checked": prompt.answer.checked if prompt.answer else None,
+                    "is_template": prompt_meta.get("is_template", False),
+                    "created_on": prompt_meta.get("created_on"),
+                    "updated_on": prompt_meta.get("updated_on"),
+                    "type": prompt_meta.get("type", prompt.inferred_type.value if prompt.inferred_type else None),
+                })
+            protocol_minimal["pages"].append({
+                "id": page.id,
+                "name": page.name,
+                "position": len(protocol_minimal["pages"]) + 1,
+                "created_on": page_meta.get("created_on"),
+                "updated_on": page_meta.get("updated_on"),
+                "prompts": minimal_prompts,
+            })
+
+        result = {
+            "conversation_id": conversation_id,
+            "campaign_id": campaign_id,
+            "protocol_source": protocol_source,
+            "qualification": qualification_evaluation,
+            "applicant_id": applicant_resume.applicant.id,
+            "resume_id": applicant_resume.resume.id,
+            "applicant": applicant_resume.applicant.model_dump(),
+            "resume": applicant_resume.resume.model_dump(),
+            "protocol_minimal": protocol_minimal,
+            "metadata": metadata,
+            "channel": "whatsapp",
+            "whatsapp_session_id": session_id,
+        }
+
+        # Send to HOC
+        try:
+            from hoc_client import HOCClient
+            hoc = HOCClient()
+            await hoc.send_applicant(result)
+            logger.info(f"[WA-PIPELINE] HOC submission successful for session {session_id}")
+        except Exception as e:
+            logger.error(f"[WA-PIPELINE] HOC submission failed for session {session_id}: {e}")
+
+        logger.info(
+            f"[WA-PIPELINE] Session {session_id} processed: "
+            f"qualified={qualification_evaluation.get('is_qualified')}, "
+            f"edu={len(applicant_resume.resume.educations)}, "
+            f"exp={len(applicant_resume.resume.experiences)}"
+        )
+
+        return result
