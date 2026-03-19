@@ -220,17 +220,21 @@ class WhatsAppHandler:
 
         if response_text:
             # Interaktive Nachricht (Buttons) oder plain text senden
+            current_step_for_send = new_step if new_step is not None else session.get("current_step", 0)
             wamid = await self._send_response(
                 to_number=session["to_number"],
                 response_text=response_text,
-                new_step=new_step if new_step is not None else session.get("current_step", 0),
+                new_step=current_step_for_send,
                 session=session,
             )
             if wamid:
+                # Prüfen ob ein Button gesendet wurde (dann Button-Beschreibung speichern)
+                button_desc = self._get_button_description(current_step_for_send, session)
+                saved_content = button_desc if button_desc else response_text
                 await DatabaseClient.append_whatsapp_message(
                     session_id=session_id,
                     role="agent",
-                    content=response_text,
+                    content=saved_content,
                 )
             else:
                 logger.error(f"[WHATSAPP] Failed to send response for session {session_id}")
@@ -250,31 +254,29 @@ class WhatsAppHandler:
         session: Dict[str, Any],
     ) -> Optional[str]:
         """
-        Sendet die Bot-Antwort – je nach Step als Freitext oder mit Buttons.
+        Sendet die Bot-Antwort – entweder als Button ODER als Text, nie beides gleichzeitig.
 
-        Buttons werden NACH der LLM-Antwort als separate Nachricht gesendet,
-        damit der Konversationsfluss natürlich bleibt (Text zuerst, dann Auswahl).
+        Wenn für den aktuellen Step ein Button ansteht, wird NUR der Button gesendet.
+        Der LLM-Text wird in diesem Fall verworfen, weil der Button selbst die Frage enthält.
+        Nur wenn kein Button folgt, wird der LLM-Text gesendet.
         """
-        from whatsapp_cloud_client import WhatsAppCloudClient
-
-        # Zuerst immer den Text senden
-        wamid = await self.wa_client.send_text_message(
-            to_number=to_number,
-            body=response_text,
-        )
-
-        if not wamid:
-            return None
-
-        # Dann ggf. passende Buttons als Folgenachricht
+        # Prüfen ob ein Button ansteht
         button_wamid = await self._maybe_send_buttons(
             to_number=to_number,
             step=new_step,
             session=session,
         )
-        if button_wamid:
-            logger.info(f"[WHATSAPP] Buttons sent for step={new_step}, wamid={button_wamid}")
 
+        if button_wamid:
+            # Button wurde gesendet → kein zusätzlicher Text
+            logger.info(f"[WHATSAPP] Button sent for step={new_step}, wamid={button_wamid}")
+            return button_wamid
+
+        # Kein Button → LLM-Text senden
+        wamid = await self.wa_client.send_text_message(
+            to_number=to_number,
+            body=response_text,
+        )
         return wamid
 
     async def _maybe_send_buttons(
@@ -652,6 +654,40 @@ class WhatsAppHandler:
         gate = "\n".join(gate_parts) if gate_parts else "(Keine Gate-Fragen vorhanden)"
         pref = "\n".join(pref_parts) if pref_parts else "(Keine Präferenzfragen vorhanden)"
         return gate, pref
+
+    @staticmethod
+    def _get_button_description(step: int, session: Dict[str, Any]) -> Optional[str]:
+        """
+        Gibt eine kurze Beschreibung des gesendeten Buttons zurück (für DB-Speicherung).
+        None wenn kein Button für diesen Step/Zustand ansteht.
+        """
+        messages = session.get("messages") or []
+        if isinstance(messages, str):
+            messages = json.loads(messages)
+        user_msgs = [m.get("content", "") for m in messages if m.get("role") == "user"]
+
+        def already_answered(*answers: str) -> bool:
+            return any(a in user_msgs for a in answers)
+
+        if step == 1:
+            if not already_answered("Ja, Deutsch ist meine Muttersprache", "Nein, Deutsch ist nicht meine Muttersprache"):
+                return "[Button] Ist Deutsch Ihre Muttersprache? (Ja / Nein)"
+            if already_answered("Nein, Deutsch ist nicht meine Muttersprache") and not already_answered("B1", "B2", "C1", "C2"):
+                return "[Button] Welches Sprachniveau haben Sie? (B1/B2/C1/C2)"
+        if step == 2:
+            if not already_answered("Vollzeit", "Teilzeit", "Beides möglich"):
+                return "[Button] Vollzeit oder Teilzeit?"
+        if step == 3:
+            if not already_answered("Deutschland", "Ausland"):
+                return "[Button] Ausbildung in Deutschland oder Ausland?"
+            if already_answered("Ausland") and not already_answered("Ja, anerkannt", "Beantragt", "Noch nicht beantragt"):
+                return "[Button] Anerkennungsstatus?"
+            if already_answered("Deutschland", "Ausland") and not already_answered("Ja, abgeschlossen", "Noch laufend"):
+                return "[Button] Ausbildung abgeschlossen oder noch laufend?"
+        if step == 4:
+            if not already_answered("Ja, es gab noch eine weitere Stelle", "Nein, das war es"):
+                return "[Button] Weitere Arbeitsstation?"
+        return None
 
     # ─── Session Completion ───────────────────────────────────────────
 
