@@ -665,6 +665,10 @@ async def whatsapp_incoming_webhook(request: Request):
         body_bytes = await request.body()
         payload = await request.json()
 
+        # Log raw payload for debugging (truncated)
+        import json as _json
+        logger.info(f"[WHATSAPP-WH] Raw payload: {_json.dumps(payload)[:500]}")
+
         # Validate Meta signature
         from whatsapp_cloud_client import WhatsAppCloudClient
         wa_client = WhatsAppCloudClient()
