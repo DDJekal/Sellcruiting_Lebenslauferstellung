@@ -23,7 +23,7 @@ REGELN:
 - Offizielle Rollenbezeichnungen
 - Tätigkeiten konkret (z.B. "Wundversorgung", nicht "normale Pflege")
 - Keine Fragen zu Kündigungsgründen oder Gehalt
-- Max. 2 Fragen pro Nachricht
+- Genau 1 Frage pro Nachricht
 
 Wenn mind. 1 Station vollständig + Bewerber hat keine weitere → Step abgeschlossen.
 

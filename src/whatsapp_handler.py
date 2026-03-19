@@ -143,17 +143,7 @@ class WhatsAppHandler:
             company_name=company_name,
         )
 
-        # Template je nach Trigger-Grund wählen
-        template_map = {
-            "voicemail": "sellcruiting_fallback_voicemail_de",
-            "busy":      "sellcruiting_fallback_busy_de",
-            "no-answer": "sellcruiting_fallback_busy_de",
-            "failed":    "sellcruiting_fallback_de",
-        }
-        template_name = template_map.get(
-            (trigger_reason or "").lower(),
-            "sellcruiting_fallback_de",
-        )
+        template_name = "sellcruiting_fallback_de"
 
         wamid = await self.wa_client.send_template_message(
             to_number=to_number,
@@ -294,42 +284,56 @@ class WhatsAppHandler:
         session: Dict[str, Any],
     ) -> Optional[str]:
         """
-        Sendet passende interaktive Buttons für den aktuellen Step.
-        Gibt wamid zurück oder None wenn keine Buttons für diesen Step vorgesehen.
+        Sendet passende interaktive Buttons für den aktuellen Step – aber nur einmal pro Frage.
 
-        Logik:
-        - Step 1 → Muttersprache Ja/Nein
-        - Step 1 + letzte Antwort war "Nein, Fremdsprache" → Sprachniveau-Liste
-        - Step 2 → Vollzeit/Teilzeit
-        - Step 3 → Ausbildungsort (Deutschland/Ausland)
-        - Step 3 + letzte Antwort war "Ausland" → Anerkennungsstatus
-        - Step 3 nach Ausbildungsort → Abschluss-Status
-        - Step 4 → Weitere Arbeitsstation?
+        Logik: Buttons werden nur gesendet wenn die zugehörige Button-Antwort noch nicht
+        in der Nachrichtenhistorie vorhanden ist. So wird vermieden dass dieselbe Frage
+        nach jeder Antwort im gleichen Step wiederholt wird.
+
+        - Step 1 → Muttersprache Ja/Nein (nur wenn noch keine Antwort)
+        - Step 1 + Nein Muttersprache → Sprachniveau-Liste (nur wenn noch kein Niveau gewählt)
+        - Step 2 → Vollzeit/Teilzeit (nur wenn noch keine Antwort)
+        - Step 3 → Ausbildungsort (nur wenn noch keine Antwort)
+        - Step 3 + Ausland → Anerkennungsstatus (nur wenn noch keine Antwort)
+        - Step 3 + Ort/Anerkennung bekannt → Abschluss-Status (nur wenn noch keine Antwort)
+        - Step 4 → Weitere Arbeitsstation (nur wenn noch keine Antwort)
         """
         from whatsapp_cloud_client import WhatsAppCloudClient
 
         messages = session.get("messages") or []
         if isinstance(messages, str):
-            import json
             messages = json.loads(messages)
 
-        last_user_msg = next(
-            (m.get("content", "") for m in reversed(messages) if m.get("role") == "user"),
-            "",
-        )
+        user_msgs = [m.get("content", "") for m in messages if m.get("role") == "user"]
+        last_user_msg = user_msgs[-1] if user_msgs else ""
+
+        # Hilfsfunktion: prüft ob eine der bekannten Antworten bereits in der Historie ist
+        def already_answered(*known_answers: str) -> bool:
+            return any(ans in user_msgs for ans in known_answers)
 
         # Step 1: Muttersprache-Frage
         if step == 1:
-            # Wenn letzte Antwort "Nein, Fremdsprache" → Sprachniveau als Liste anzeigen
-            if last_user_msg in ("Nein, Deutsch ist nicht meine Muttersprache", "Nein, Fremdsprache"):
-                body, button_label, sections = WhatsAppCloudClient.list_language_level()
-                return await self.wa_client.send_list_message(
-                    to_number=to_number,
-                    body=body,
-                    button_label=button_label,
-                    sections=sections,
-                )
-            # Sonst: Muttersprache Ja/Nein fragen
+            native_answers = (
+                "Ja, Deutsch ist meine Muttersprache",
+                "Nein, Deutsch ist nicht meine Muttersprache",
+            )
+            level_answers = ("B1", "B2", "C1", "C2")
+
+            # Sprachniveau-Liste: nur wenn "Nein" gewählt aber noch kein Niveau
+            if already_answered(*native_answers):
+                if last_user_msg in ("Nein, Deutsch ist nicht meine Muttersprache",) \
+                        and not already_answered(*level_answers):
+                    body, button_label, sections = WhatsAppCloudClient.list_language_level()
+                    return await self.wa_client.send_list_message(
+                        to_number=to_number,
+                        body=body,
+                        button_label=button_label,
+                        sections=sections,
+                    )
+                # Muttersprache bereits beantwortet → keine weiteren Buttons für Step 1
+                return None
+
+            # Noch keine Antwort → Muttersprache Ja/Nein fragen
             body, buttons = WhatsAppCloudClient.buttons_german_native()
             return await self.wa_client.send_button_message(
                 to_number=to_number,
@@ -337,8 +341,10 @@ class WhatsAppHandler:
                 buttons=buttons,
             )
 
-        # Step 2: Vollzeit/Teilzeit
+        # Step 2: Vollzeit/Teilzeit – nur wenn noch keine Antwort
         if step == 2:
+            if already_answered("Vollzeit", "Teilzeit", "Beides möglich"):
+                return None
             body, buttons = WhatsAppCloudClient.buttons_fulltime_parttime()
             return await self.wa_client.send_button_message(
                 to_number=to_number,
@@ -346,33 +352,49 @@ class WhatsAppHandler:
                 buttons=buttons,
             )
 
-        # Step 3: Ausbildungsort – und bei Ausland direkt Anerkennung nachfragen
+        # Step 3: Ausbildung
         if step == 3:
-            if last_user_msg == "Ausland":
+            edu_loc_answers = ("Deutschland", "Ausland")
+            recog_answers = ("Ja, anerkannt", "Beantragt", "Noch nicht beantragt")
+            edu_status_answers = ("Ja, abgeschlossen", "Noch laufend")
+
+            # Anerkennungsstatus: nur wenn Ausland gewählt aber noch keine Anerkennungsantwort
+            if already_answered("Ausland") and not already_answered(*recog_answers):
                 body, buttons = WhatsAppCloudClient.buttons_recognition_status()
                 return await self.wa_client.send_button_message(
                     to_number=to_number,
                     body=body,
                     buttons=buttons,
                 )
-            # Abschluss-Status (abgeschlossen/laufend)
-            if last_user_msg in ("Deutschland", "Ja, anerkannt", "Beantragt", "Noch nicht beantragt"):
+
+            # Abschluss-Status: nur wenn Ort (und ggf. Anerkennung) bekannt aber noch kein Status
+            if already_answered(*edu_loc_answers) and not already_answered(*edu_status_answers):
+                # Bei Ausland: erst Anerkennung abwarten
+                if already_answered("Ausland") and not already_answered(*recog_answers):
+                    return None
                 body, buttons = WhatsAppCloudClient.buttons_education_status()
                 return await self.wa_client.send_button_message(
                     to_number=to_number,
                     body=body,
                     buttons=buttons,
                 )
-            # Standard-Einstieg in Step 3: Ausbildungsort fragen
-            body, buttons = WhatsAppCloudClient.buttons_education_location()
-            return await self.wa_client.send_button_message(
-                to_number=to_number,
-                body=body,
-                buttons=buttons,
-            )
 
-        # Step 4: Weitere Arbeitsstation?
+            # Ausbildungsort noch nicht bekannt → fragen
+            if not already_answered(*edu_loc_answers):
+                body, buttons = WhatsAppCloudClient.buttons_education_location()
+                return await self.wa_client.send_button_message(
+                    to_number=to_number,
+                    body=body,
+                    buttons=buttons,
+                )
+
+            # Alle Step-3-Fragen beantwortet
+            return None
+
+        # Step 4: Weitere Arbeitsstation – nur wenn noch keine Antwort
         if step == 4:
+            if already_answered("Ja, es gab noch eine weitere Stelle", "Nein, das war es"):
+                return None
             body, buttons = WhatsAppCloudClient.buttons_more_experience()
             return await self.wa_client.send_button_message(
                 to_number=to_number,

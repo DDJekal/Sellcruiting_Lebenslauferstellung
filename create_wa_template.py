@@ -19,6 +19,11 @@ import os
 import sys
 from pathlib import Path
 
+# Windows-Konsole auf UTF-8 umstellen
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+
 # Src-Verzeichnis in Pfad aufnehmen
 sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 
@@ -30,46 +35,18 @@ load_dotenv()
 
 TEMPLATES = {
     "sellcruiting_fallback_de": {
-        "description": "Erstansprache bei nicht erreichtem Bewerber (allgemein)",
+        "description": "Erstansprache bei nicht erreichtem Bewerber",
         "body_text": (
             "Hallo {{1}}, ich bin Laura, die digitale Bewerbungsassistenz von {{2}}. "
-            "Wir haben versucht, Sie telefonisch zu erreichen – leider ohne Erfolg. "
-            "Möchten Sie Ihre Bewerbung in ca. 5 Minuten per Chat vervollständigen? "
-            "Antworten Sie einfach mit \"Ja, gerne\"."
+            "Wir haben versucht, Sie telefonisch wegen Ihrer Bewerbung zu erreichen. "
+            "Wenn Sie möchten, kann ich hier einige Angaben zu Ihrer Bewerbung aufnehmen "
+            "und an unser Recruiting-Team weiterleiten. "
+            "Sind Sie damit einverstanden, hier einen Chat mit der KI zu starten? "
+            "Alternativ können Sie das Gespräch auch über den Link in Ihrer E-Mail beginnen. "
+            "Weitere Informationen zum Datenschutz finden Sie hier: "
+            "https://karriere.high-office.com/datenschutz"
         ),
         "example_values": ["Max Mustermann", "Caritas GmbH"],
-        "category": "UTILITY",
-        "language": "de",
-        "buttons": [
-            {"type": "QUICK_REPLY", "text": "Ja, gerne"},
-            {"type": "QUICK_REPLY", "text": "Nein danke"},
-        ],
-    },
-    "sellcruiting_fallback_voicemail_de": {
-        "description": "Erstansprache nach Mailbox-Erkennung",
-        "body_text": (
-            "Hallo {{1}}, hier ist Laura, die digitale Bewerbungsassistenz von {{2}}. "
-            "Ich habe eben versucht, Sie anzurufen und bin auf Ihre Mailbox gestoßen. "
-            "Damit Ihre Bewerbung nicht verloren geht: Möchten Sie die fehlenden "
-            "Informationen kurz per Chat ergänzen? Das dauert ca. 5 Minuten."
-        ),
-        "example_values": ["Anna Beispiel", "Pflegezentrum Nord GmbH"],
-        "category": "UTILITY",
-        "language": "de",
-        "buttons": [
-            {"type": "QUICK_REPLY", "text": "Ja, gerne"},
-            {"type": "QUICK_REPLY", "text": "Nein danke"},
-        ],
-    },
-    "sellcruiting_fallback_busy_de": {
-        "description": "Erstansprache wenn Leitung besetzt war (busy/no-answer)",
-        "body_text": (
-            "Hallo {{1}}, ich bin Laura, die digitale Bewerbungsassistenz von {{2}}. "
-            "Wir haben gerade versucht, Sie zu erreichen – die Leitung war leider besetzt. "
-            "Kein Problem! Möchten Sie Ihre Bewerbung kurz per Chat weiterführen? "
-            "Das dauert nur ca. 5 Minuten."
-        ),
-        "example_values": ["Peter Muster", "Klinikum Stuttgart GmbH"],
         "category": "UTILITY",
         "language": "de",
         "buttons": [

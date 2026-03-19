@@ -22,7 +22,7 @@ REGELN:
 - Konkrete Namen für Institution, nicht vage
 - Offizielle Abschlussbezeichnung, nicht umgangssprachlich
 - Bei Ausland: Anerkennung erfragen
-- Max. 2 Fragen pro Nachricht
+- Genau 1 Frage pro Nachricht – nicht mehrere Details auf einmal abfragen
 
 Wenn alle Pflichtfelder beantwortet → Step abgeschlossen.
 
