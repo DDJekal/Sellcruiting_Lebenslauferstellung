@@ -477,6 +477,14 @@ class WhatsAppHandler:
         step_prompt = step_prompt.replace("{gate_questions}", gate_q)
         step_prompt = step_prompt.replace("{preference_questions}", pref_q)
 
+        # Dem LLM mitteilen welche Fragen per Button kommen – damit er sie NICHT im Text stellt
+        messages = session.get("messages") or []
+        if isinstance(messages, str):
+            messages = json.loads(messages)
+        user_msgs = [m.get("content", "") for m in messages if m.get("role") == "user"]
+
+        button_hint = self._build_button_hint(step, user_msgs)
+
         context = (
             f"\n\nKONTEXT:\n"
             f"- Bewerber: {session.get('candidate_first_name', '?')} {session.get('candidate_last_name', '?')}\n"
@@ -485,9 +493,70 @@ class WhatsAppHandler:
             f"- Aktueller Step: {step}\n"
             f"\nHINWEIS: Der Bewerber kann Antworten per Button-Auswahl oder Freitext senden. "
             f"Button-Antworten wurden bereits in Klartext umgewandelt."
+            f"{button_hint}"
         )
 
         return self._system_prompt_cache + "\n\n" + step_prompt + context
+
+    @staticmethod
+    def _build_button_hint(step: int, user_msgs: list) -> str:
+        """
+        Gibt einen Hinweis zurück welche Frage direkt nach dieser Antwort als Button gesendet wird.
+        Der LLM soll diese Frage dann NICHT im Text stellen.
+        """
+        def already_answered(*answers: str) -> bool:
+            return any(a in user_msgs for a in answers)
+
+        if step == 1:
+            native_answers = ("Ja, Deutsch ist meine Muttersprache", "Nein, Deutsch ist nicht meine Muttersprache")
+            level_answers = ("B1", "B2", "C1", "C2")
+            if not already_answered(*native_answers):
+                return (
+                    "\n\nBUTTON-HINWEIS: Nach deiner Antwort wird automatisch ein Button gesendet mit der Frage "
+                    "\"Ist Deutsch Ihre Muttersprache?\". Stelle diese Frage NICHT im Text – "
+                    "beende deine Nachricht ohne Frage nach der Sprache."
+                )
+            if already_answered("Nein, Deutsch ist nicht meine Muttersprache") and not already_answered(*level_answers):
+                return (
+                    "\n\nBUTTON-HINWEIS: Nach deiner Antwort wird automatisch ein Button gesendet mit der Frage "
+                    "nach dem Sprachniveau (B1/B2/C1/C2). Stelle diese Frage NICHT im Text."
+                )
+
+        if step == 2:
+            if not already_answered("Vollzeit", "Teilzeit", "Beides möglich"):
+                return (
+                    "\n\nBUTTON-HINWEIS: Nach deiner Antwort wird automatisch ein Button gesendet mit der Frage "
+                    "\"Vollzeit oder Teilzeit?\". Stelle diese Frage NICHT im Text."
+                )
+
+        if step == 3:
+            edu_loc = ("Deutschland", "Ausland")
+            recog = ("Ja, anerkannt", "Beantragt", "Noch nicht beantragt")
+            edu_status = ("Ja, abgeschlossen", "Noch laufend")
+            if not already_answered(*edu_loc):
+                return (
+                    "\n\nBUTTON-HINWEIS: Nach deiner Antwort wird automatisch ein Button gesendet mit der Frage "
+                    "\"Ausbildung in Deutschland oder Ausland?\". Stelle diese Frage NICHT im Text."
+                )
+            if already_answered("Ausland") and not already_answered(*recog):
+                return (
+                    "\n\nBUTTON-HINWEIS: Nach deiner Antwort wird automatisch ein Button gesendet mit der Frage "
+                    "zum Anerkennungsstatus. Stelle diese Frage NICHT im Text."
+                )
+            if already_answered(*edu_loc) and not already_answered(*edu_status):
+                return (
+                    "\n\nBUTTON-HINWEIS: Nach deiner Antwort wird automatisch ein Button gesendet mit der Frage "
+                    "\"Ausbildung abgeschlossen oder noch laufend?\". Stelle diese Frage NICHT im Text."
+                )
+
+        if step == 4:
+            if not already_answered("Ja, es gab noch eine weitere Stelle", "Nein, das war es"):
+                return (
+                    "\n\nBUTTON-HINWEIS: Nach deiner Antwort wird automatisch ein Button gesendet mit der Frage "
+                    "\"Gab es noch eine weitere Arbeitsstation?\". Stelle diese Frage NICHT im Text."
+                )
+
+        return ""
 
     def _build_user_prompt(self, messages: List[Dict[str, Any]]) -> str:
         """Convert message history to a chat transcript for the LLM."""
